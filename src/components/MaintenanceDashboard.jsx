@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { rtdb } from '../config/firebase';
-import { ref, onValue } from 'firebase/database';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Wrench, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
