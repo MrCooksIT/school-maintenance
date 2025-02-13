@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './components/auth/AuthProvider';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import Login from './components/auth/Login';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 function App() {
   return (
@@ -10,7 +11,14 @@ function App() {
         <div className="min-h-screen bg-gray-50">
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<MaintenanceDashboard />} />
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <MaintenanceDashboard />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </div>
       </AuthProvider>
