@@ -4,6 +4,21 @@ import MaintenanceDashboard from './components/MaintenanceDashboard';
 import Login from './components/auth/Login';
 import { useAuth } from './components/auth/AuthProvider';
 
+// Add this ProtectedRoute component inside App.jsx
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  return children;
+}
+
 function App() {
   return (
     <Router basename="/school-maintenance">
