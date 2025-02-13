@@ -1,7 +1,7 @@
 // src/components/MaintenanceDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { ref, onValue } from 'firebase/database';
-import { rtdb } from '../config/firebase';
+import { realtimeDb } from '../config/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Wrench, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
@@ -10,7 +10,7 @@ const MaintenanceDashboard = () => {
   const [tickets, setTickets] = useState([]);
 
   useEffect(() => {
-    const ticketsRef = ref(rtdb, 'tickets');
+    const ticketsRef = ref(realtimeDb, 'tickets');
     const unsubscribe = onValue(ticketsRef, (snapshot) => {
       if (snapshot.exists()) {
         const ticketsData = snapshot.val();
