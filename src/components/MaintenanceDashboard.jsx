@@ -1,20 +1,18 @@
 // src/components/MaintenanceDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { ref, onValue } from 'firebase/database';
-import { realtimeDb } from '../config/firebase';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Wrench, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { database } from '@/config/firebase';  // Using @ alias
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';  // Relative path for components
+import { Badge } from './ui/badge';  // Relative path for components
 
 const MaintenanceDashboard = () => {
   const [tickets, setTickets] = useState([]);
 
   useEffect(() => {
-    const ticketsRef = ref(realtimeDb, 'tickets');
+    const ticketsRef = ref(database, 'tickets');  // Using the imported 'database'
     const unsubscribe = onValue(ticketsRef, (snapshot) => {
       if (snapshot.exists()) {
         const ticketsData = snapshot.val();
-        // Convert object to array and sort by createdAt
         const ticketsArray = Object.entries(ticketsData).map(([key, value]) => ({
           firebaseKey: key,
           ...value
@@ -25,6 +23,7 @@ const MaintenanceDashboard = () => {
 
     return () => unsubscribe();
   }, []);
+
 
   const getStatusIcon = (status) => {
     switch (status) {
