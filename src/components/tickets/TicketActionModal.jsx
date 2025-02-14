@@ -4,7 +4,13 @@ import { ref, update } from 'firebase/database';
 import { database } from '@/config/firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from '../ui/select';
 
 const STAFF_MEMBERS = [
     { id: 'staff1', name: 'John Smith', department: 'Plumbing' },
@@ -45,10 +51,11 @@ const TicketActionModal = ({ ticket, isOpen, onClose }) => {
                     <DialogTitle>Update Ticket {ticket.ticketId}</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
+                // Inside your TicketActionModal component
                     <div className="grid gap-2">
                         <label className="text-sm font-medium">Assign To:</label>
                         <Select value={assignedTo} onValueChange={setAssignedTo}>
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select staff member" />
                             </SelectTrigger>
                             <SelectContent>
@@ -60,10 +67,11 @@ const TicketActionModal = ({ ticket, isOpen, onClose }) => {
                             </SelectContent>
                         </Select>
                     </div>
+
                     <div className="grid gap-2">
                         <label className="text-sm font-medium">Status:</label>
                         <Select value={status} onValueChange={setStatus}>
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                                 <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>
