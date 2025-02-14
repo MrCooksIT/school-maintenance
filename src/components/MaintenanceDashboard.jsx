@@ -1,14 +1,20 @@
 // src/components/MaintenanceDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { ref, onValue } from 'firebase/database';
-import { database } from '@/config/firebase';  // Using @ alias
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';  // Relative path for components
-import { Badge } from './ui/badge';  // Relative path for components
-import { Clock, AlertCircle, CheckCircle2, Wrench } from 'lucide-react';
+import { database } from '@/config/firebase';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Select } from './ui/select';
+import TicketActionModal from './tickets/TicketActionModal';
+import { Clock, AlertCircle, CheckCircle2, Wrench, User } from 'lucide-react';
 
 const MaintenanceDashboard = () => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [filterStaff, setFilterStaff] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
 
   useEffect(() => {
     const ticketsRef = ref(database, 'tickets');  // Using the imported 'database'
@@ -55,6 +61,13 @@ const MaintenanceDashboard = () => {
     completed: tickets.filter(t => t.status === 'completed').length,
     high: tickets.filter(t => t.priority === 'high').length
   };
+
+  const filteredTickets = tickets.filter(ticket => {
+    if (filterStaff !== 'all' && ticket.assignedTo !== filterStaff) return false;
+    if (filterStatus !== 'all' && ticket.status !== filterStatus) return false;
+    return true;
+  });
+
 
   return (
     <div className="container mx-auto p-6">
@@ -112,45 +125,86 @@ const MaintenanceDashboard = () => {
           </CardContent>
         </Card>
       </div>
+      {/* Filters */}
+      <div className="flex gap-4 mb-6">
+        <Select
+          value={filterStaff}
+          onValueChange={setFilterStaff}
+          className="w-[200px]"
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Filter by staff" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Staff</SelectItem>
+            {STAFF_MEMBERS.map((staff) => (
+              <SelectItem key={staff.id} value={staff.id}>
+                {staff.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      {/* Tickets List */}
+        <Select
+          value={filterStatus}
+          onValueChange={setFilterStatus}
+          className="w-[200px]"
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {TICKET_STATUSES.map((status) => (
+              <SelectItem key={status.value} value={status.value}>
+                {status.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="space-y-4">
-        {tickets.map((ticket) => (
-          <Card key={ticket.id} className="hover:bg-gray-50">
+        {filteredTickets.map((ticket) => (
+          <Card
+            key={ticket.id}
+            className="hover:bg-gray-50 cursor-pointer"
+            onClick={() => setSelectedTicket(ticket)}
+          >
             <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-4">
+              {/* ... your existing ticket card content ... */}
+              <div className="mt-4 flex justify-between items-center">
                 <div className="flex items-center space-x-2">
-                  <Badge variant="outline">{ticket.ticketId}</Badge>
-                  <Badge className={
-                    ticket.priority === 'high' ? 'bg-red-100 text-red-800' :
-                      ticket.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                  }>
-                    {ticket.priority}
-                  </Badge>
+                  {ticket.assignedTo && (
+                    <div className="flex items-center text-sm text-gray-500">
+                      <User className="w-4 h-4 mr-1" />
+                      {STAFF_MEMBERS.find(s => s.id === ticket.assignedTo)?.name || 'Unassigned'}
+                    </div>
+                  )}
                 </div>
-                <Badge variant="outline">
-                  {new Date(ticket.createdAt).toLocaleDateString()}
-                </Badge>
-              </div>
-
-              <h3 className="font-semibold mb-2">{ticket.subject}</h3>
-              <p className="text-gray-600 mb-4">{ticket.description}</p>
-
-              <div className="grid grid-cols-2 gap-4 text-sm text-gray-500">
-                <div>
-                  <span className="font-medium">Location: </span>
-                  {ticket.location}
-                </div>
-                <div>
-                  <span className="font-medium">Requester: </span>
-                  {ticket.requester.name}
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedTicket(ticket);
+                  }}
+                >
+                  Manage
+                </Button>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {selectedTicket && (
+        <TicketActionModal
+          ticket={selectedTicket}
+          isOpen={!!selectedTicket}
+          onClose={() => setSelectedTicket(null)}
+        />
+      )}
     </div>
   );
 };

@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@firebase/database": "^1.0.12",
+    "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-select": "^2.1.6",
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-toast": "^1.2.6",
     "class-variance-authority": "^0.7.0",
