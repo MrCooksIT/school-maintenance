@@ -4,9 +4,11 @@ import { ref, onValue } from 'firebase/database';
 import { database } from '@/config/firebase';  // Using @ alias
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';  // Relative path for components
 import { Badge } from './ui/badge';  // Relative path for components
+import { Clock, AlertCircle, CheckCircle2, Wrench } from 'lucide-react';
 
 const MaintenanceDashboard = () => {
   const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const ticketsRef = ref(database, 'tickets');  // Using the imported 'database'
@@ -14,11 +16,14 @@ const MaintenanceDashboard = () => {
       if (snapshot.exists()) {
         const ticketsData = snapshot.val();
         const ticketsArray = Object.entries(ticketsData).map(([key, value]) => ({
-          firebaseKey: key,
+          id: key,
           ...value
         })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setTickets(ticketsArray);
+      } else {
+        setTickets([]);
       }
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -48,47 +53,89 @@ const MaintenanceDashboard = () => {
     new: tickets.filter(t => t.status === 'new').length,
     inProgress: tickets.filter(t => t.status === 'in-progress').length,
     completed: tickets.filter(t => t.status === 'completed').length,
-    total: tickets.length
+    high: tickets.filter(t => t.priority === 'high').length
   };
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-8">Maintenance Dashboard</h1>
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Maintenance Dashboard</h1>
+      </div>
 
       {/* Stats Overview */}
-      <div className="grid gap-6 md:grid-cols-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">New Tickets</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.new}</div>
+            <div className="flex items-center">
+              <Clock className="w-4 h-4 text-blue-500 mr-2" />
+              <span className="text-2xl font-bold">{stats.new}</span>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Similar cards for other stats */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Wrench className="w-4 h-4 text-yellow-500 mr-2" />
+              <span className="text-2xl font-bold">{stats.inProgress}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <CheckCircle2 className="w-4 h-4 text-green-500 mr-2" />
+              <span className="text-2xl font-bold">{stats.completed}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">High Priority</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
+              <span className="text-2xl font-bold">{stats.high}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tickets List */}
       <div className="space-y-4">
         {tickets.map((ticket) => (
-          <Card key={ticket.firebaseKey} className="hover:bg-gray-50">
+          <Card key={ticket.id} className="hover:bg-gray-50">
             <CardContent className="p-6">
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center space-x-2">
                   <Badge variant="outline">{ticket.ticketId}</Badge>
-                  <Badge className={getPriorityStyle(ticket.priority)}>
-                    {ticket.priority?.toUpperCase()}
+                  <Badge className={
+                    ticket.priority === 'high' ? 'bg-red-100 text-red-800' :
+                      ticket.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                  }>
+                    {ticket.priority}
                   </Badge>
                 </div>
-                <div className="flex items-center space-x-2">
-                  {getStatusIcon(ticket.status)}
-                  <span className="text-sm font-medium capitalize">{ticket.status}</span>
-                </div>
+                <Badge variant="outline">
+                  {new Date(ticket.createdAt).toLocaleDateString()}
+                </Badge>
               </div>
 
-              <h3 className="font-semibold mb-1">{ticket.subject}</h3>
-              <p className="text-sm text-gray-600 mb-2">{ticket.description}</p>
+              <h3 className="font-semibold mb-2">{ticket.subject}</h3>
+              <p className="text-gray-600 mb-4">{ticket.description}</p>
 
               <div className="grid grid-cols-2 gap-4 text-sm text-gray-500">
                 <div>
@@ -98,10 +145,6 @@ const MaintenanceDashboard = () => {
                 <div>
                   <span className="font-medium">Requester: </span>
                   {ticket.requester.name}
-                </div>
-                <div>
-                  <span className="font-medium">Created: </span>
-                  {new Date(ticket.createdAt).toLocaleString()}
                 </div>
               </div>
             </CardContent>
