@@ -1,4 +1,3 @@
-// src/components/tickets/TicketActionModal.jsx
 import React, { useState } from 'react';
 import { ref, update } from 'firebase/database';
 import { database } from '@/config/firebase';
@@ -7,16 +6,18 @@ import { Button } from '../ui/button';
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
     SelectValue
 } from '../ui/select';
 
+// Constants for the form
 const STAFF_MEMBERS = [
     { id: 'staff1', name: 'John Smith', department: 'Plumbing' },
     { id: 'staff2', name: 'Sarah Johnson', department: 'Electrical' },
     { id: 'staff3', name: 'Mike Brown', department: 'General Maintenance' },
-    // Add your actual staff members here
 ];
 
 const TICKET_STATUSES = [
@@ -26,8 +27,8 @@ const TICKET_STATUSES = [
 ];
 
 const TicketActionModal = ({ ticket, isOpen, onClose }) => {
-    const [assignedTo, setAssignedTo] = useState(ticket.assignedTo || '');
-    const [status, setStatus] = useState(ticket.status || 'new');
+    const [assignedTo, setAssignedTo] = useState(ticket?.assignedTo || '');
+    const [status, setStatus] = useState(ticket?.status || 'new');
 
     const handleUpdate = async () => {
         try {
@@ -36,7 +37,6 @@ const TicketActionModal = ({ ticket, isOpen, onClose }) => {
                 assignedTo,
                 status,
                 lastUpdated: new Date().toISOString(),
-                lastUpdatedBy: 'current-user-id' // Replace with actual user ID
             });
             onClose();
         } catch (error) {
@@ -46,16 +46,16 @@ const TicketActionModal = ({ ticket, isOpen, onClose }) => {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Update Ticket {ticket.ticketId}</DialogTitle>
+                    <DialogTitle>Update Ticket {ticket?.ticketId}</DialogTitle>
                 </DialogHeader>
+
                 <div className="grid gap-4 py-4">
-                // Inside your TicketActionModal component
                     <div className="grid gap-2">
                         <label className="text-sm font-medium">Assign To:</label>
                         <Select value={assignedTo} onValueChange={setAssignedTo}>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select staff member" />
                             </SelectTrigger>
                             <SelectContent>
@@ -71,7 +71,7 @@ const TicketActionModal = ({ ticket, isOpen, onClose }) => {
                     <div className="grid gap-2">
                         <label className="text-sm font-medium">Status:</label>
                         <Select value={status} onValueChange={setStatus}>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -84,6 +84,7 @@ const TicketActionModal = ({ ticket, isOpen, onClose }) => {
                         </Select>
                     </div>
                 </div>
+
                 <div className="flex justify-end gap-3">
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
                     <Button onClick={handleUpdate}>Update Ticket</Button>
