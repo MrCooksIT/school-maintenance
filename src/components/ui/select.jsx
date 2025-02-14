@@ -5,11 +5,11 @@ import { Check, ChevronDown } from "lucide-react"
 
 import { cn } from "../../lib/utils"
 
-const Select = SelectPrimitive.Root
+const SelectRoot = SelectPrimitive.Root;
 
-const SelectGroup = SelectPrimitive.Group
+const SelectGroup = SelectPrimitive.Group;
 
-const SelectValue = SelectPrimitive.Value
+const SelectValue = SelectPrimitive.Value;
 
 const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) => (
     <SelectPrimitive.Trigger
@@ -91,10 +91,22 @@ const SelectSeparator = React.forwardRef(({ className, ...props }, ref) => (
         {...props}
     />
 ))
-SelectSeparator.displayName = SelectPrimitive.Separator.displayName
+SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
 
+export const Select = {
+    Root: SelectRoot,
+    Group: SelectGroup,
+    Value: SelectValue,
+    Trigger: SelectTrigger,
+    Content: SelectContent,
+    Label: SelectLabel,
+    Item: SelectItem,
+    Separator: SelectSeparator
+};
+
+// Also keep individual exports
 export {
-    Select,
+    SelectRoot,
     SelectGroup,
     SelectValue,
     SelectTrigger,
@@ -102,4 +114,4 @@ export {
     SelectLabel,
     SelectItem,
     SelectSeparator,
-}
+};

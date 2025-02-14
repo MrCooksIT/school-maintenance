@@ -3,12 +3,10 @@ import { ref, update } from 'firebase/database';
 import { database } from '@/config/firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Button } from '../ui/button';
+import { Select } from '../ui/select'
 import {
-    Select,
     SelectContent,
-    SelectGroup,
     SelectItem,
-    SelectLabel,
     SelectTrigger,
     SelectValue
 } from '../ui/select';
@@ -29,7 +27,6 @@ const TICKET_STATUSES = [
 const TicketActionModal = ({ ticket, isOpen, onClose }) => {
     const [assignedTo, setAssignedTo] = useState(ticket?.assignedTo || '');
     const [status, setStatus] = useState(ticket?.status || 'new');
-
     const handleUpdate = async () => {
         try {
             const ticketRef = ref(database, `tickets/${ticket.id}`);
@@ -54,34 +51,34 @@ const TicketActionModal = ({ ticket, isOpen, onClose }) => {
                 <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
                         <label className="text-sm font-medium">Assign To:</label>
-                        <Select value={assignedTo} onValueChange={setAssignedTo}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select staff member" />
-                            </SelectTrigger>
-                            <SelectContent>
+                        <Select.Root value={assignedTo} onValueChange={setAssignedTo}>
+                            <Select.Trigger>
+                                <Select.Value placeholder="Select staff member" />
+                            </Select.Trigger>
+                            <Select.Content>
                                 {STAFF_MEMBERS.map((staff) => (
-                                    <SelectItem key={staff.id} value={staff.id}>
+                                    <Select.Item key={staff.id} value={staff.id}>
                                         {staff.name} - {staff.department}
-                                    </SelectItem>
+                                    </Select.Item>
                                 ))}
-                            </SelectContent>
-                        </Select>
+                            </Select.Content>
+                        </Select.Root>
                     </div>
 
                     <div className="grid gap-2">
                         <label className="text-sm font-medium">Status:</label>
-                        <Select value={status} onValueChange={setStatus}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
+                        <Select.Root value={status} onValueChange={setStatus}>
+                            <Select.Trigger>
+                                <Select.Value placeholder="Select status" />
+                            </Select.Trigger>
+                            <Select.Content>
                                 {TICKET_STATUSES.map((status) => (
-                                    <SelectItem key={status.value} value={status.value}>
+                                    <Select.Item key={status.value} value={status.value}>
                                         {status.label}
-                                    </SelectItem>
+                                    </Select.Item>
                                 ))}
-                            </SelectContent>
-                        </Select>
+                            </Select.Content>
+                        </Select.Root>
                     </div>
                 </div>
 
