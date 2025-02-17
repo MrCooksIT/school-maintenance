@@ -38,13 +38,6 @@ const PRIORITY_OPTIONS = [
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' }
 ];
-
-const STAFF_MEMBERS = [
-  { id: 'staff1', name: 'Joshua Charles', department: '' },
-  { id: 'staff2', name: 'Tyler Rani', department: '' },
-  { id: 'staff3', name: 'Ronelle Kemp', department: '' }
-];
-
 // Badge Components
 const StatusBadge = ({ status }) => {
   const statusStyles = {
@@ -75,7 +68,7 @@ const PriorityBadge = ({ priority }) => {
 };
 
 // TicketRow Component
-const TicketRow = ({ ticket, onTicketClick }) => {
+const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState(ticket);
 
@@ -186,7 +179,6 @@ const TicketRow = ({ ticket, onTicketClick }) => {
           <PriorityBadge priority={editedData.priority} />
         )}
       </td>
-
       <td className="px-4 py-2">
         {isEditing ? (
           <Select
@@ -198,7 +190,7 @@ const TicketRow = ({ ticket, onTicketClick }) => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="unassigned">Unassigned</SelectItem>
-              {STAFF_MEMBERS.map((staff) => (
+              {staffMembers.map((staff) => (
                 <SelectItem key={staff.id} value={staff.id}>
                   {staff.name} - {staff.department}
                 </SelectItem>
@@ -209,7 +201,7 @@ const TicketRow = ({ ticket, onTicketClick }) => {
           <div className="flex items-center gap-2">
             {editedData.assignedTo ? (
               <Badge variant="outline">
-                {STAFF_MEMBERS.find(s => s.id === editedData.assignedTo)?.name || 'Unknown'}
+                {staffMembers.find(s => s.id === editedData.assignedTo)?.name || 'Unknown'}
               </Badge>
             ) : (
               <Badge variant="secondary">Unassigned</Badge>
@@ -253,6 +245,7 @@ const MaintenanceDashboard = () => {
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [staffMembers, setStaffMembers] = useState([]);
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
     to: new Date()
@@ -270,6 +263,22 @@ const MaintenanceDashboard = () => {
           }))
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setTickets(ticketsArray);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // Load staff members
+    const staffRef = ref(database, 'staff');
+    const unsubscribe = onValue(staffRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const staffData = Object.entries(snapshot.val()).map(([id, data]) => ({
+          id,
+          ...data,
+        }));
+        setStaffMembers(staffData);
       }
     });
 
@@ -377,6 +386,7 @@ const MaintenanceDashboard = () => {
                   key={ticket.id}
                   ticket={ticket}
                   onTicketClick={handleTicketClick}
+                  staffMembers={staffMembers}
                 />
               ))}
             </tbody>
