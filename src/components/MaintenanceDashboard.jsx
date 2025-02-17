@@ -40,9 +40,9 @@ const PRIORITY_OPTIONS = [
 ];
 
 const STAFF_MEMBERS = [
-  { id: 'staff1', name: 'Jonathan Charles', department: '' },
-  { id: 'staff2', name: 'Tyler', department: '' },
-  { id: 'staff3', name: 'Ebbie', department: '' }
+  { id: 'staff1', name: 'Joshua Charles', department: '' },
+  { id: 'staff2', name: 'Tyler Rani', department: '' },
+  { id: 'staff3', name: 'Ronelle Kemp', department: '' }
 ];
 
 // Badge Components
