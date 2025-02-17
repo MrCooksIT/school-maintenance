@@ -1,21 +1,28 @@
 // src/components/ui/select.jsx
-import * as React from "react"
-import * as SelectPrimitive from "@radix-ui/react-select"
-import { Check, ChevronDown } from "lucide-react"
+import * as React from "react";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { Check, ChevronDown } from "lucide-react";
 
-import { cn } from "../../lib/utils"
+import { cn } from "@/lib/utils";
 
-const SelectRoot = SelectPrimitive.Root;
+// Define selectVariants
+const selectVariants = {
+    default: "bg-white text-black",
+    primary: "bg-blue-500 text-white",
+    secondary: "bg-gray-500 text-white",
+};
 
-const SelectGroup = SelectPrimitive.Group;
+// Define Select
+const Select = SelectPrimitive.Root;
 
+// Define SelectValue
 const SelectValue = SelectPrimitive.Value;
 
 const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) => (
     <SelectPrimitive.Trigger
         ref={ref}
         className={cn(
-            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
             className
         )}
         {...props}
@@ -25,8 +32,8 @@ const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) 
             <ChevronDown className="h-4 w-4 opacity-50" />
         </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
-))
-SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
+));
+SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 const SelectContent = React.forwardRef(({ className, children, position = "popper", ...props }, ref) => (
     <SelectPrimitive.Portal>
@@ -52,8 +59,8 @@ const SelectContent = React.forwardRef(({ className, children, position = "poppe
             </SelectPrimitive.Viewport>
         </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
-))
-SelectContent.displayName = SelectPrimitive.Content.displayName
+));
+SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 const SelectLabel = React.forwardRef(({ className, ...props }, ref) => (
     <SelectPrimitive.Label
@@ -61,8 +68,8 @@ const SelectLabel = React.forwardRef(({ className, ...props }, ref) => (
         className={cn("py-1.5 pl-8 pr-2 text-sm font-semibold", className)}
         {...props}
     />
-))
-SelectLabel.displayName = SelectPrimitive.Label.displayName
+));
+SelectLabel.displayName = SelectPrimitive.Label.displayName;
 
 const SelectItem = React.forwardRef(({ className, children, ...props }, ref) => (
     <SelectPrimitive.Item
@@ -81,8 +88,8 @@ const SelectItem = React.forwardRef(({ className, children, ...props }, ref) => 
 
         <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
-))
-SelectItem.displayName = SelectPrimitive.Item.displayName
+));
+SelectItem.displayName = SelectPrimitive.Item.displayName;
 
 const SelectSeparator = React.forwardRef(({ className, ...props }, ref) => (
     <SelectPrimitive.Separator
@@ -90,28 +97,22 @@ const SelectSeparator = React.forwardRef(({ className, ...props }, ref) => (
         className={cn("-mx-1 my-1 h-px bg-muted", className)}
         {...props}
     />
-))
+));
 SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
 
-export const Select = {
-    Root: SelectRoot,
-    Group: SelectGroup,
-    Value: SelectValue,
-    Trigger: SelectTrigger,
-    Content: SelectContent,
-    Label: SelectLabel,
-    Item: SelectItem,
-    Separator: SelectSeparator
-};
+const SelectGroup = SelectPrimitive.Group;
+SelectGroup.displayName = SelectPrimitive.Group.displayName;
 
-// Also keep individual exports
+// Export all components
 export {
-    SelectRoot,
+    Select,
     SelectGroup,
-    SelectValue,
+    SelectPrimitive,
+    SelectLabel,
+    selectVariants,
     SelectTrigger,
     SelectContent,
-    SelectLabel,
     SelectItem,
     SelectSeparator,
+    SelectValue, // Add this line
 };

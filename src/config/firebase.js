@@ -13,10 +13,11 @@ const firebaseConfig = {
     databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL
 };
 
+console.log('Firebase Config:', {
+    ...firebaseConfig,
+    apiKey: firebaseConfig.apiKey ? 'exists' : 'missing' // Don't log the actual key
+});
+
 const app = initializeApp(firebaseConfig);
-
-const auth = getAuth(app);
-const db = getFirestore(app);
-const database = getDatabase(app);
-
-export { auth, db, database };
+export const auth = getAuth(app);
+export const database = getDatabase(app);

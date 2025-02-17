@@ -11,14 +11,17 @@
   "dependencies": {
     "@firebase/database": "^1.0.12",
     "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-popover": "^1.1.6",
     "@radix-ui/react-select": "^2.1.6",
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-toast": "^1.2.6",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
+    "date-fns": "^4.1.0",
     "firebase": "^11.3.1",
     "lucide-react": "^0.323.0",
     "react": "^18.2.0",
+    "react-day-picker": "^9.5.1",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.1.5",
     "tailwind-merge": "^2.2.1"

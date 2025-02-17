@@ -1,210 +1,355 @@
 // src/components/MaintenanceDashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, update } from 'firebase/database';
 import { database } from '@/config/firebase';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
+import { DateRangePicker } from './DateRangePicker';
+import {
+  Filter,
+  Calendar,
+  MoreVertical,
+  CheckCircle2,
+  Clock
+} from 'lucide-react';
 import { Button } from './ui/button';
-import { Select } from './ui/select';
-import TicketActionModal from './tickets/TicketActionModal';
-import { Clock, AlertCircle, CheckCircle2, Wrench, User } from 'lucide-react';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 
+// Constants
+const STATUS_OPTIONS = [
+  { value: 'new', label: 'New' },
+  { value: 'in-progress', label: 'In Progress' },
+  { value: 'completed', label: 'Completed' }
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' }
+];
+
+const STAFF_MEMBERS = [
+  { id: 'staff1', name: 'John Smith', department: 'Maintenance' },
+  { id: 'staff2', name: 'Sarah Johnson', department: 'Electrical' },
+  { id: 'staff3', name: 'Mike Brown', department: 'IT' }
+];
+
+// Badge Components
+const StatusBadge = ({ status }) => {
+  const statusStyles = {
+    new: "bg-blue-100 text-blue-800 border-blue-200",
+    "in-progress": "bg-yellow-100 text-yellow-800 border-yellow-200",
+    completed: "bg-green-100 text-green-800 border-green-200"
+  };
+
+  return (
+    <Badge className={`${statusStyles[status]} text-xs uppercase`}>
+      {status}
+    </Badge>
+  );
+};
+
+const PriorityBadge = ({ priority }) => {
+  const priorityStyles = {
+    high: "bg-red-100 text-red-800 border-red-200",
+    medium: "bg-orange-100 text-orange-800 border-orange-200",
+    low: "bg-green-100 text-green-800 border-green-200"
+  };
+
+  return (
+    <Badge className={`${priorityStyles[priority]} text-xs uppercase`}>
+      {priority}
+    </Badge>
+  );
+};
+
+// TicketRow Component
+const TicketRow = ({ ticket }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState(ticket);
+
+  const handleCellEdit = (field, value) => {
+    setEditedData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = async () => {
+    try {
+      const ticketRef = ref(database, `tickets/${ticket.id}`);
+      await update(ticketRef, {
+        ...editedData,
+        lastUpdated: new Date().toISOString()
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating ticket:', error);
+    }
+  };
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="px-4 py-2 text-sm">
+        {typeof editedData.requester === 'object'
+          ? editedData.requester.email || editedData.requester.name
+          : editedData.requester}
+      </td>
+
+      <td className="px-4 py-2 text-sm">
+        {isEditing ? (
+          <Input
+            type="date"
+            value={editedData.dueDate || ''}
+            onChange={(e) => handleCellEdit('dueDate', e.target.value)}
+            className="h-8"
+          />
+        ) : (
+          editedData.dueDate || 'No due date'
+        )}
+      </td>
+
+      <td className="px-4 py-2 text-sm font-mono">{editedData.ticketId}</td>
+
+      <td className="px-4 py-2">
+        {isEditing ? (
+          <Select
+            value={editedData.status}
+            onValueChange={(value) => handleCellEdit('status', value)}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((status) => (
+                <SelectItem key={status.value} value={status.value}>
+                  {status.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <StatusBadge status={editedData.status} />
+        )}
+      </td>
+
+      <td className="px-4 py-2 text-sm">
+        {isEditing ? (
+          <Input
+            value={editedData.subject}
+            onChange={(e) => handleCellEdit('subject', e.target.value)}
+            className="h-8"
+          />
+        ) : (
+          editedData.subject
+        )}
+      </td>
+
+      <td className="px-4 py-2 text-sm">
+        {isEditing ? (
+          <Input
+            value={editedData.description}
+            onChange={(e) => handleCellEdit('description', e.target.value)}
+            className="h-8"
+          />
+        ) : (
+          editedData.description
+        )}
+      </td>
+
+      <td className="px-4 py-2">
+        {isEditing ? (
+          <Select
+            value={editedData.priority}
+            onValueChange={(value) => handleCellEdit('priority', value)}
+          >
+            <SelectTrigger className="h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PRIORITY_OPTIONS.map((priority) => (
+                <SelectItem key={priority.value} value={priority.value}>
+                  {priority.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <PriorityBadge priority={editedData.priority} />
+        )}
+      </td>
+
+      <td className="px-4 py-2">
+        {isEditing ? (
+          <Select
+            value={editedData.assignedTo || "unassigned"}
+            onValueChange={(value) => handleCellEdit('assignedTo', value === 'unassigned' ? null : value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select staff member" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
+              {STAFF_MEMBERS.map((staff) => (
+                <SelectItem key={staff.id} value={staff.id}>
+                  {staff.name} - {staff.department}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <div className="flex items-center gap-2">
+            {editedData.assignedTo ? (
+              <Badge variant="outline">
+                {STAFF_MEMBERS.find(s => s.id === editedData.assignedTo)?.name || 'Unknown'}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Unassigned</Badge>
+            )}
+          </div>
+        )}
+      </td>
+
+      <td className="px-4 py-2">
+        <div className="flex gap-1">
+          {isEditing ? (
+            <>
+              <Button size="sm" variant="ghost" onClick={handleSave}>
+                Save
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+};
+
+// Main Dashboard Component
 const MaintenanceDashboard = () => {
   const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [filterStaff, setFilterStaff] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('open');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateRange, setDateRange] = useState({
+    from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+    to: new Date()
+  });
 
   useEffect(() => {
-    const ticketsRef = ref(database, 'tickets');  // Using the imported 'database'
+    const ticketsRef = ref(database, 'tickets');
     const unsubscribe = onValue(ticketsRef, (snapshot) => {
       if (snapshot.exists()) {
         const ticketsData = snapshot.val();
-        const ticketsArray = Object.entries(ticketsData).map(([key, value]) => ({
-          id: key,
-          ...value
-        })).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        const ticketsArray = Object.entries(ticketsData)
+          .map(([id, value]) => ({
+            id,
+            ...value
+          }))
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setTickets(ticketsArray);
-      } else {
-        setTickets([]);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'new': return <Clock className="h-4 w-4 text-blue-500" />;
-      case 'in-progress': return <Wrench className="h-4 w-4 text-yellow-500" />;
-      case 'completed': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      default: return null;
-    }
-  };
-
-  const getPriorityStyle = (priority) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-700 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-700 border-green-200';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200';
-    }
-  };
-
-  // Calculate stats
-  const stats = {
-    new: tickets.filter(t => t.status === 'new').length,
-    inProgress: tickets.filter(t => t.status === 'in-progress').length,
-    completed: tickets.filter(t => t.status === 'completed').length,
-    high: tickets.filter(t => t.priority === 'high').length
-  };
-
   const filteredTickets = tickets.filter(ticket => {
-    if (filterStaff !== 'all' && ticket.assignedTo !== filterStaff) return false;
-    if (filterStatus !== 'all' && ticket.status !== filterStatus) return false;
-    return true;
+    const matchesStatus = filterStatus === 'open'
+      ? ticket.status !== 'completed'
+      : ticket.status === 'completed';
+
+    const matchesSearch = searchQuery
+      ? Object.values(ticket).some(value =>
+        String(value).toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      : true;
+
+    const ticketDate = new Date(ticket.createdAt);
+    const matchesDate = ticketDate >= dateRange.from && ticketDate <= dateRange.to;
+
+    return matchesStatus && matchesSearch && matchesDate;
   });
 
-
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Maintenance Dashboard</h1>
-      </div>
-
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">New Tickets</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <Clock className="w-4 h-4 text-blue-500 mr-2" />
-              <span className="text-2xl font-bold">{stats.new}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <Wrench className="w-4 h-4 text-yellow-500 mr-2" />
-              <span className="text-2xl font-bold">{stats.inProgress}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <CheckCircle2 className="w-4 h-4 text-green-500 mr-2" />
-              <span className="text-2xl font-bold">{stats.completed}</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">High Priority</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center">
-              <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
-              <span className="text-2xl font-bold">{stats.high}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      {/* Filters */}
-      <div className="flex gap-4 mb-6">
-        <Select
-          value={filterStaff}
-          onValueChange={setFilterStaff}
-          className="w-[200px]"
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Filter by staff" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Staff</SelectItem>
-            {STAFF_MEMBERS.map((staff) => (
-              <SelectItem key={staff.id} value={staff.id}>
-                {staff.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={filterStatus}
-          onValueChange={setFilterStatus}
-          className="w-[200px]"
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {TICKET_STATUSES.map((status) => (
-              <SelectItem key={status.value} value={status.value}>
-                {status.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-4">
-        {filteredTickets.map((ticket) => (
-          <Card
-            key={ticket.id}
-            className="hover:bg-gray-50 cursor-pointer"
-            onClick={() => setSelectedTicket(ticket)}
+    <div className="p-6">
+      <div className="mb-6">
+        <div className="flex gap-2 mb-4">
+          <Button
+            variant={filterStatus === 'open' ? 'default' : 'outline'}
+            onClick={() => setFilterStatus('open')}
           >
-            <CardContent className="p-6">
-              {/* ... your existing ticket card content ... */}
-              <div className="mt-4 flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  {ticket.assignedTo && (
-                    <div className="flex items-center text-sm text-gray-500">
-                      <User className="w-4 h-4 mr-1" />
-                      {STAFF_MEMBERS.find(s => s.id === ticket.assignedTo)?.name || 'Unassigned'}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedTicket(ticket);
-                  }}
-                >
-                  Manage
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            Open
+          </Button>
+          <Button
+            variant={filterStatus === 'closed' ? 'default' : 'outline'}
+            onClick={() => setFilterStatus('closed')}
+          >
+            Closed
+          </Button>
+        </div>
 
-      {selectedTicket && (
-        <TicketActionModal
-          ticket={selectedTicket}
-          isOpen={!!selectedTicket}
-          onClose={() => setSelectedTicket(null)}
-        />
-      )}
+        <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Tickets</h2>
+            <Badge variant="secondary">{filteredTickets.length}</Badge>
+          </div>
+
+          <div className="flex-1" />
+
+          <DateRangePicker
+            dateRange={dateRange}
+            onUpdate={setDateRange}
+          />
+
+          <Input
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="max-w-xs"
+          />
+
+          <Button variant="default" className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Clear Filters
+          </Button>
+        </div>
+
+        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Reported By</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Due Date</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Ticket Number</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Title</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Description</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Priority</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Assigned To</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {filteredTickets.map(ticket => (
+                <TicketRow
+                  key={ticket.id}
+                  ticket={ticket}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 };
