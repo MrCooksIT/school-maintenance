@@ -1,4 +1,4 @@
-// src/components/MaintenanceDashboard.jsx
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import React, { useState, useEffect } from 'react';
 import { ref, onValue, update } from 'firebase/database';
 import { database } from '@/config/firebase';
@@ -8,7 +8,8 @@ import {
   Calendar,
   MoreVertical,
   CheckCircle2,
-  Clock
+  Clock,
+  MessageSquare
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -20,6 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
+import { TicketComments } from './tickets/TicketComments';
+import { FileUpload } from './tickets/FileUpload';
+import { Dialog, DialogContent } from './ui/dialog';
+import { AdminPanel } from './admin/AdminPanel';
 
 // Constants
 const STATUS_OPTIONS = [
@@ -35,9 +40,9 @@ const PRIORITY_OPTIONS = [
 ];
 
 const STAFF_MEMBERS = [
-  { id: 'staff1', name: 'John Smith', department: 'Maintenance' },
-  { id: 'staff2', name: 'Sarah Johnson', department: 'Electrical' },
-  { id: 'staff3', name: 'Mike Brown', department: 'IT' }
+  { id: 'staff1', name: 'Jonathan Charles', department: '' },
+  { id: 'staff2', name: 'Tyler', department: '' },
+  { id: 'staff3', name: 'Ebbie', department: '' }
 ];
 
 // Badge Components
@@ -70,7 +75,7 @@ const PriorityBadge = ({ priority }) => {
 };
 
 // TicketRow Component
-const TicketRow = ({ ticket }) => {
+const TicketRow = ({ ticket, onTicketClick }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState(ticket);
 
@@ -92,7 +97,7 @@ const TicketRow = ({ ticket }) => {
   };
 
   return (
-    <tr className="hover:bg-gray-50">
+    <tr className="hover:bg-gray-50 cursor-pointer">
       <td className="px-4 py-2 text-sm">
         {typeof editedData.requester === 'object'
           ? editedData.requester.email || editedData.requester.name
@@ -215,6 +220,13 @@ const TicketRow = ({ ticket }) => {
 
       <td className="px-4 py-2">
         <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => onTicketClick(ticket)}
+          >
+            <MessageSquare className="h-4 w-4" />
+          </Button>
           {isEditing ? (
             <>
               <Button size="sm" variant="ghost" onClick={handleSave}>
@@ -235,11 +247,12 @@ const TicketRow = ({ ticket }) => {
   );
 };
 
-// Main Dashboard Component
 const MaintenanceDashboard = () => {
   const [tickets, setTickets] = useState([]);
   const [filterStatus, setFilterStatus] = useState('open');
+  const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTicket, setSelectedTicket] = useState(null);
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
     to: new Date()
@@ -280,6 +293,20 @@ const MaintenanceDashboard = () => {
     return matchesStatus && matchesSearch && matchesDate;
   });
 
+  const handleTicketClick = (ticket) => {
+    setSelectedTicket(ticket);
+    setCommentModalOpen(true);
+  };
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setDateRange({
+      from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+      to: new Date()
+    });
+    setFilterStatus('open');
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -318,10 +345,15 @@ const MaintenanceDashboard = () => {
             className="max-w-xs"
           />
 
-          <Button variant="default" className="flex items-center gap-2">
+          <Button
+            variant="default"
+            className="flex items-center gap-2"
+            onClick={handleClearFilters}
+          >
             <Filter className="h-4 w-4" />
             Clear Filters
           </Button>
+          <AdminPanel />
         </div>
 
         <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
@@ -344,11 +376,41 @@ const MaintenanceDashboard = () => {
                 <TicketRow
                   key={ticket.id}
                   ticket={ticket}
+                  onTicketClick={handleTicketClick}
                 />
               ))}
             </tbody>
           </table>
         </div>
+
+        <Dialog open={commentModalOpen} onOpenChange={setCommentModalOpen}>
+          <DialogContent className="max-w-3xl min-h-[600px] bg-[#0a1e46] text-white">
+            <Tabs defaultValue="comments" className="h-full flex flex-col">
+              <TabsList className="bg-[#0f2a5e] mb-2">
+                <TabsTrigger
+                  value="comments"
+                  className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white"
+                >
+                  Comments
+                </TabsTrigger>
+                <TabsTrigger
+                  value="files"
+                  className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white"
+                >
+                  Files
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex-1 overflow-y-auto">
+                <TabsContent value="comments" className="h-full m-0"> {/* Remove default margin */}
+                  <TicketComments ticketId={selectedTicket?.id} />
+                </TabsContent>
+                <TabsContent value="files" className="h-full m-0">
+                  <FileUpload ticketId={selectedTicket?.id} />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

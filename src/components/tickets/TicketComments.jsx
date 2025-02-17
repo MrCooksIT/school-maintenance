@@ -1,26 +1,19 @@
 // src/components/tickets/TicketComments.jsx
 import React, { useState, useEffect } from 'react';
-import { ref, push, onValue, serverTimestamp } from 'firebase/database';
-import { database } from '@/config/firebase';
-import { format } from 'date-fns';
+import { ref, push, onValue } from 'firebase/database';
+import { database, auth } from '@/config/firebase';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle
-} from '../ui/card';
-import { Badge } from '../ui/badge';
-import { Send, AlertCircle } from 'lucide-react';
+import { format } from 'date-fns';
+import { useAuthState } from 'react-firebase-hooks/auth'; // Install this package if not already installed
 
 export function TicketComments({ ticketId }) {
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [user] = useAuthState(auth);
 
     useEffect(() => {
+        if (!ticketId) return;
         const commentsRef = ref(database, `tickets/${ticketId}/comments`);
         const unsubscribe = onValue(commentsRef, (snapshot) => {
             if (snapshot.exists()) {
@@ -31,6 +24,8 @@ export function TicketComments({ ticketId }) {
                     }))
                     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                 setComments(commentsData);
+            } else {
+                setComments([]);
             }
         });
 
@@ -39,93 +34,72 @@ export function TicketComments({ ticketId }) {
 
     const handleSubmitComment = async (e) => {
         e.preventDefault();
-        if (!newComment.trim()) return;
+        if (!newComment.trim() || !user) return;
 
-        setIsSubmitting(true);
         try {
             const commentsRef = ref(database, `tickets/${ticketId}/comments`);
             await push(commentsRef, {
                 content: newComment.trim(),
-                author: {
-                    name: "Current User", // Replace with actual user data
-                    id: "user123",
-                    role: "Maintenance Staff"
-                },
-                timestamp: new Date().toISOString(),
-                type: 'comment' // Can be 'comment', 'status_update', 'assignment', etc.
+                user: user.displayName || 'Anonymous',
+                userEmail: user.email,
+                userPhotoURL: user.photoURL,
+                timestamp: new Date().toISOString()
             });
             setNewComment('');
         } catch (error) {
             console.error('Error adding comment:', error);
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="space-y-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-sm font-medium">Add Comment</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmitComment} className="space-y-4">
-                        <Textarea
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            placeholder="Add a comment or update..."
-                            className="min-h-[100px]"
-                        />
-                        <div className="flex justify-end">
-                            <Button
-                                type="submit"
-                                disabled={isSubmitting || !newComment.trim()}
-                            >
-                                <Send className="h-4 w-4 mr-2" />
-                                {isSubmitting ? 'Sending...' : 'Send'}
-                            </Button>
-                        </div>
-                    </form>
-                </CardContent>
-            </Card>
-
-            <div className="space-y-4">
+        <div className="flex flex-col h-full bg-[#0a1e46] text-white">
+            {/* Comments List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {comments.map((comment) => (
-                    <CommentItem key={comment.id} comment={comment} />
+                    <div key={comment.id} className="bg-[#0f2a5e] rounded-lg p-4 border border-gray-700">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                {comment.userPhotoURL ? (
+                                    <img
+                                        src={comment.userPhotoURL}
+                                        alt={comment.user}
+                                        className="w-8 h-8 rounded-full"
+                                    />
+                                ) : (
+                                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center uppercase">
+                                        {comment.user?.[0] || 'A'}
+                                    </div>
+                                )}
+                                <span className="font-medium">{comment.user}</span>
+                            </div>
+                            <span className="text-sm text-gray-300">
+                                {format(new Date(comment.timestamp), 'MMM d, yyyy, h:mm a')}
+                            </span>
+                        </div>
+                        <p className="text-sm">{comment.content}</p>
+                    </div>
                 ))}
             </div>
-        </div>
-    );
-}
 
-function CommentItem({ comment }) {
-    return (
-        <div className="flex gap-4 p-4 rounded-lg border bg-card">
-            <Avatar>
-                <AvatarFallback>
-                    {comment.author.name.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-            </Avatar>
-
-            <div className="flex-1 space-y-1">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="font-medium">{comment.author.name}</span>
-                        <Badge variant="outline">{comment.author.role}</Badge>
+            {/* Comment Input - Fixed at bottom */}
+            <div className="border-t border-gray-700 p-4 bg-[#0f2a5e] mt-auto">
+                <form onSubmit={handleSubmitComment} className="space-y-2">
+                    <Textarea
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        className="min-h-[100px] resize-none bg-[#0a1e46] border-gray-700 text-white placeholder:text-gray-400"
+                    />
+                    <div className="flex justify-end">
+                        <Button
+                            type="submit"
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                            disabled={!newComment.trim() || !user}
+                        >
+                            Post Comment
+                        </Button>
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                        {format(new Date(comment.timestamp), 'PPp')}
-                    </span>
-                </div>
-
-                <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
-
-                {comment.type === 'status_update' && (
-                    <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                        <AlertCircle className="h-4 w-4" />
-                        <span>Status updated to: {comment.newStatus}</span>
-                    </div>
-                )}
+                </form>
             </div>
         </div>
     );
