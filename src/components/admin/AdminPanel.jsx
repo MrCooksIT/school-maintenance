@@ -255,6 +255,9 @@ export function AdminPanel() {
             <SheetContent className="w-[400px] sm:w-[540px] bg-[#0a1e46] text-white h-screen overflow-y-auto p-6">
                 <SheetHeader>
                     <SheetTitle className="text-white">System Management</SheetTitle>
+                    <SheetDescription className="text-gray-300">
+                        Manage staff, locations, and view analytics
+                    </SheetDescription>
                 </SheetHeader>
 
                 <Tabs defaultValue="staff" className="mt-6">
