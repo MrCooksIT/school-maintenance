@@ -1,4 +1,3 @@
-// src/components/admin/AdminPanel.jsx
 import React, { useState, useEffect } from 'react';
 import { ref, update, remove, push, onValue } from 'firebase/database';
 import { database } from '@/config/firebase';
@@ -14,12 +13,13 @@ import {
     LabelList
 } from 'recharts';
 import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from "@/components/ui/sheet";
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogTrigger,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,25 +31,28 @@ import {
     BarChart4,
     TrendingUp,
     TrendingDown,
-    Minus
+    Minus,
+    X
 } from 'lucide-react';
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
-    CardTitle
+    CardTitle,
 } from "@/components/ui/card";
 
 export function AdminPanel() {
+    const [isOpen, setIsOpen] = useState(false);
     const [currentStaff, setCurrentStaff] = useState([]);
-    const [tickets, setTickets] = useState([])
+    const [tickets, setTickets] = useState([]);
     const [newStaff, setNewStaff] = useState({
         name: '',
         department: '',
         email: ''
     });
     const [locations, setLocations] = useState([]);
+
     useEffect(() => {
         const ticketsRef = ref(database, 'tickets');
         const unsubscribe = onValue(ticketsRef, (snapshot) => {
@@ -64,7 +67,7 @@ export function AdminPanel() {
 
         return () => unsubscribe();
     }, []);
-    // Load staff from Firebase
+
     useEffect(() => {
         const staffRef = ref(database, 'staff');
         const unsubscribe = onValue(staffRef, (snapshot) => {
@@ -82,7 +85,6 @@ export function AdminPanel() {
         return () => unsubscribe();
     }, []);
 
-    // Load locations from Firebase
     useEffect(() => {
         const locationsRef = ref(database, 'locations');
         const unsubscribe = onValue(locationsRef, (snapshot) => {
@@ -102,39 +104,26 @@ export function AdminPanel() {
 
     const handleAddStaff = async () => {
         if (!newStaff.name || !newStaff.department) return;
+
         try {
             const staffRef = ref(database, 'staff');
-            const newStaffMember = {
-                name: newStaff.name,
-                department: newStaff.department,
-                email: newStaff.email,
+            await push(staffRef, {
+                ...newStaff,
                 activeTickets: 0,
                 createdAt: new Date().toISOString()
-            };
-            await push(staffRef, newStaffMember);
-            setNewStaff({
-                name: '',
-                department: '',
-                email: ''
             });
-            alert('Staff member added successfully!');
+            setNewStaff({ name: '', department: '', email: '' });
         } catch (error) {
             console.error('Error adding staff:', error);
-            alert('Failed to add staff member. Please try again.');
         }
     };
-
-    const handleAddLocation = async (locationName) => {
-        if (!locationName) return;
+    const handleEditStaff = async (staffId) => {
+        if (!window.confirm('Are you sure you want to remove this staff member?')) return;
 
         try {
-            const locationsRef = ref(database, 'locations');
-            await push(locationsRef, {
-                name: locationName,
-                createdAt: new Date().toISOString()
-            });
+            await remove(ref(database, `staff/${staffId}`));
         } catch (error) {
-            console.error('Error adding location:', error);
+            console.error('Error removing staff:', error);
         }
     };
 
@@ -146,6 +135,17 @@ export function AdminPanel() {
         } catch (error) {
             console.error('Error removing staff:', error);
         }
+    };
+    const calculateAvgResolutionTime = (tickets) => {
+        const completedTickets = tickets.filter(t => t.status === 'completed');
+        if (completedTickets.length === 0) return 0;
+
+        const totalTime = completedTickets.reduce((acc, ticket) => {
+            const created = new Date(ticket.createdAt);
+            const completed = new Date(ticket.lastUpdated);
+            return acc + (completed - created) / (1000 * 60 * 60);
+        }, 0);
+        return Math.round(totalTime / completedTickets.length);
     };
     const MetricCard = ({ title, value, subValue, trend, trendValue }) => (
         <div className="p-4 bg-[#0a1e46] rounded-lg border border-gray-700">
@@ -167,6 +167,7 @@ export function AdminPanel() {
             </div>
         </div>
     );
+
     const calculateAnalytics = () => {
         if (currentStaff.length === 0 || tickets.length === 0) {
             return {
@@ -179,24 +180,28 @@ export function AdminPanel() {
         }
 
         const staffPerformance = currentStaff.map(staff => {
-            const staffTickets = tickets.filter(t =>
-                t.assignedTo === staff.id && t.status === 'completed'
-            );
+            const staffTickets = tickets.filter(t => t.assignedTo === staff.id);
+            const activeTickets = staffTickets.filter(t => t.status !== 'completed').length;
 
-            const totalTime = staffTickets.reduce((acc, ticket) => {
-                if (!ticket.completedAt) return acc; // Skip if no completedAt
+
+            const completedTickets = staffTickets.filter(t => t.status === 'completed');
+            const totalTime = completedTickets.reduce((acc, ticket) => {
                 const created = new Date(ticket.createdAt);
-                const completed = new Date(ticket.completedAt);
+                const completed = new Date(ticket.lastUpdated);
                 return acc + (completed - created) / (1000 * 60 * 60);
             }, 0);
 
             return {
                 name: staff.name,
-                avgTime: staffTickets.length ? Math.round(totalTime / staffTickets.length) : 0,
-                totalTickets: staffTickets.length
+                avgTime: completedTickets.length ? Math.round(totalTime / completedTickets.length) : 0,
+                totalTickets: staffTickets.length,
+                activeTickets,
+                completedTickets: completedTickets.length,
+                highPriorityTickets: staffTickets.filter(t => t.priority === 'high').length
             };
         });
-        // Calculate monthly trends
+
+
         const monthlyTrends = Array.from({ length: 6 }, (_, i) => {
             const date = new Date();
             date.setMonth(date.getMonth() - i);
@@ -205,39 +210,36 @@ export function AdminPanel() {
             const monthTickets = tickets.filter(t => {
                 const ticketDate = new Date(t.createdAt);
                 return ticketDate.getMonth() === date.getMonth() &&
-                    ticketDate.getFullYear() === date.getFullYear() &&
-                    t.status === 'completed';
+                    ticketDate.getFullYear() === date.getFullYear();
             });
-
-            const totalTime = monthTickets.reduce((acc, ticket) => {
-                const created = new Date(ticket.createdAt);
-                const completed = new Date(ticket.completedAt);
-                return acc + (completed - created) / (1000 * 60 * 60);
-            }, 0);
-
             return {
                 month,
-                avgResolutionTime: monthTickets.length ? Math.round(totalTime / monthTickets.length) : 0,
-                ticketCount: monthTickets.length
+                total: monthTickets.length,
+                completed: monthTickets.filter(t => t.status === 'completed').length,
+                avgResolutionTime: calculateAvgResolutionTime(monthTickets),
+                highPriority: monthTickets.filter(t => t.priority === 'high').length
             };
         }).reverse();
 
+        const openTickets = tickets.filter(t => t.status !== 'completed');
+        const bestPerformer = staffPerformance.reduce((best, current) => {
+            if (current.completedTickets === 0) return best;
+            const bestScore = best.completedTickets / (best.avgTime || 1);
+            const currentScore = current.completedTickets / (current.avgTime || 1);
+            return currentScore > bestScore ? current : best;
+        }, staffPerformance[0]);
         return {
             staffPerformance,
             monthlyTrends,
-            topPerformer: staffPerformance.reduce((a, b) =>
-                (a.avgTime < b.avgTime ? a : b), staffPerformance[0]),
-            overallAvg: Math.round(
-                staffPerformance.reduce((acc, staff) =>
-                    acc + (staff.avgTime * staff.totalTickets), 0) /
-                staffPerformance.reduce((acc, staff) =>
-                    acc + staff.totalTickets, 0)
-            ),
-            openTickets: tickets.filter(t => t.status !== 'completed').length
+            topPerformer: bestPerformer,
+            overallAvg: calculateAvgResolutionTime(tickets),
+            openTickets: openTickets.length,
+            highPriorityOpen: openTickets.filter(t => t.priority === 'high').length,
+            totalTickets: tickets.length,
+            completionRate: Math.round((tickets.filter(t => t.status === 'completed').length / tickets.length) * 100)
         };
     };
 
-    // Use the analytics in your component
     const {
         staffPerformance,
         monthlyTrends,
@@ -245,276 +247,316 @@ export function AdminPanel() {
         overallAvg,
         openTickets
     } = calculateAnalytics();
+
     return (
-        <Sheet>
-            <SheetTrigger asChild>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
                 <Button variant="outline" size="icon">
                     <Settings className="h-4 w-4" />
                 </Button>
-            </SheetTrigger>
-            <SheetContent className="w-[400px] sm:w-[540px] bg-[#0a1e46] text-white h-screen overflow-y-auto p-6">
-                <SheetHeader>
-                    <SheetTitle className="text-white">System Management</SheetTitle>
-                    <SheetDescription className="text-gray-300">
-                        Manage staff, locations, and view analytics
-                    </SheetDescription>
-                </SheetHeader>
+            </DialogTrigger>
+            <DialogContent className="w-[95vw] h-[95vh] max-w-[1800px] p-0 bg-[#0a1e46] text-white">
+                <div className="shrink-0 p-6 border-b border-gray-700">
+                    <DialogTitle className="text-xl font-bold text-white">System Management</DialogTitle>
+                    <DialogDescription className="text-gray-300">
+                        Manage staff, view analytics, and configure system settings
+                    </DialogDescription>
+                </div>
 
-                <Tabs defaultValue="staff" className="mt-6">
-                    <TabsList className="grid w-full grid-cols-4 bg-[#0f2a5e]">  {/* Change to grid-cols-4 */}
-                        <TabsTrigger
-                            value="staff"
-                            className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white"
-                        >
-                            <Users className="h-4 w-4 mr-2" />
-                            Staff
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="workload"
-                            className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white"
-                        >
-                            <Activity className="h-4 w-4 mr-2" />
-                            Workload
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="analytics"  // Add this
-                            className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white"
-                        >
-                            <BarChart4 className="h-4 w-4 mr-2" />
-                            Analytics
-                        </TabsTrigger>
-                        <TabsTrigger
-                            value="locations"
-                            className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white"
-                        >
-                            <Building className="h-4 w-4 mr-2" />
-                            Locations
-                        </TabsTrigger>
-                    </TabsList>
+                <div className="flex-1 min-h-0 flex flex-col">
+                    <Tabs defaultValue="analytics" className="flex-1 flex flex-col min-h-0">
+                        <div className="shrink-0 px-6 pt-6">
+                            <TabsList className="grid w-full grid-cols-4 bg-[#0f2a5e]">
+                                <TabsTrigger value="analytics" className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white">
+                                    <BarChart4 className="h-4 w-4 mr-2" />
+                                    Analytics
+                                </TabsTrigger>
+                                <TabsTrigger value="staff" className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white">
+                                    <Users className="h-4 w-4 mr-2" />
+                                    Staff
+                                </TabsTrigger>
+                                <TabsTrigger value="workload" className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white">
+                                    <Activity className="h-4 w-4 mr-2" />
+                                    Workload
+                                </TabsTrigger>
+                                <TabsTrigger value="locations" className="text-gray-300 data-[state=active]:bg-[#0a1e46] data-[state=active]:text-white">
+                                    <Building className="h-4 w-4 mr-2" />
+                                    Locations
+                                </TabsTrigger>
+                            </TabsList>
+                        </div>
 
-                    <TabsContent value="staff" className="space-y-4 mt-4">
-                        <Card className="bg-[#0f2a5e] border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="text-white">Add Staff Member</CardTitle>
-                                <CardDescription className="text-gray-300">
-                                    Add new maintenance staff to the system
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Input
-                                        placeholder="Name"
-                                        value={newStaff.name}
-                                        onChange={(e) => setNewStaff(prev => ({ ...prev, name: e.target.value }))}
-                                        className="bg-[#0a1e46] border-gray-700 text-white placeholder:text-gray-400"
-                                    />
-                                    <Input
-                                        placeholder="Department"
-                                        value={newStaff.department}
-                                        onChange={(e) => setNewStaff(prev => ({ ...prev, department: e.target.value }))}
-                                        className="bg-[#0a1e46] border-gray-700 text-white placeholder:text-gray-400"
-                                    />
-                                    <Input
-                                        placeholder="Email"
-                                        type="email"
-                                        value={newStaff.email}
-                                        onChange={(e) => setNewStaff(prev => ({ ...prev, email: e.target.value }))}
-                                        className="bg-[#0a1e46] border-gray-700 text-white placeholder:text-gray-400"
-                                    />
-                                    <Button onClick={handleAddStaff} className="w-full bg-blue-600 hover:bg-blue-700">
-                                        Add Staff Member
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-[#0f2a5e] border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="text-white">Current Staff</CardTitle>
-                                <CardDescription className="text-gray-300">
-                                    Manage existing staff members
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-2">
-                                    {currentStaff.map((staff) => (
-                                        <div
-                                            key={staff.id}
-                                            className="flex items-center justify-between p-2 border border-gray-700 rounded-lg bg-[#0a1e46]"
-                                        >
-                                            <div>
-                                                <p className="font-medium text-white">{staff.name}</p>
-                                                <p className="text-sm text-gray-300">{staff.department}</p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm text-gray-300">
-                                                    {staff.activeTickets} active tickets
-                                                </span>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleRemoveStaff(staff.id)}
-                                                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                                                >
-                                                    Remove
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    <TabsContent value="workload">
-                        <Card className="bg-[#0f2a5e] border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="text-white">Staff Workload</CardTitle>
-                                <CardDescription className="text-gray-300">
-                                    Current ticket distribution
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {currentStaff.map((staff) => (
-                                        <div key={staff.id} className="space-y-1">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm font-medium text-white">{staff.name}</span>
-                                                <span className="text-sm text-gray-300">
-                                                    {staff.activeTickets} tickets
-                                                </span>
-                                            </div>
-                                            <div className="h-2 bg-[#0a1e46] rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full transition-all"
-                                                    style={{
-                                                        width: `${Math.min((staff.activeTickets / 5) * 100, 100)}%`,
-                                                        backgroundColor: staff.activeTickets > 4 ? '#ef4444' : '#3b82f6'
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    <TabsContent value="analytics">
-                        <Card className="bg-[#0f2a5e] border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="text-white">Ticket Analytics</CardTitle>
-                                <CardDescription className="text-gray-300">
-                                    Performance metrics and turnaround times
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-6">
-                                    <div>
-                                        <h3 className="text-sm font-medium text-white mb-3">Average Resolution Time by Staff</h3>
-                                        <div className="h-[300px] w-full">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={staffPerformance}>
-                                                    <XAxis dataKey="name" stroke="#94a3b8" />
-                                                    <YAxis
-                                                        stroke="#94a3b8"
-                                                        tickFormatter={(value) => `${value}h`}
-                                                    />
-                                                    <Tooltip
-                                                        contentStyle={{ backgroundColor: '#0a1e46', border: 'none' }}
-                                                        labelStyle={{ color: 'white' }}
-                                                    />
-                                                    <Bar dataKey="avgTime" fill="#3b82f6">
-                                                        <LabelList dataKey="avgTime" position="top" fill="#94a3b8" />
-                                                    </Bar>
-                                                </BarChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="text-sm font-medium text-white mb-3">Monthly Resolution Trends</h3>
-                                        <div className="h-[300px] w-full">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={monthlyTrends}>
-                                                    <XAxis dataKey="month" stroke="#94a3b8" />
-                                                    <YAxis stroke="#94a3b8" />
-                                                    <Tooltip
-                                                        contentStyle={{ backgroundColor: '#0a1e46', border: 'none' }}
-                                                        labelStyle={{ color: 'white' }}
-                                                    />
-                                                    <Line
-                                                        type="monotone"
-                                                        dataKey="avgResolutionTime"
-                                                        stroke="#3b82f6"
-                                                        strokeWidth={2}
-                                                    />
-                                                </LineChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-4">
+                        <div className="flex-1 overflow-y-auto px-6 pb-6">
+                            <TabsContent value="analytics" className="mt-6 space-y-8 pt-2">
+                                <div className="space-y-8">
+                                    <div className="grid grid-cols-3 gap-6">
                                         <MetricCard
                                             title="Best Performer"
-                                            value={topPerformer.name}
-                                            subValue={`${topPerformer.avgTime}h avg`}
+                                            value={topPerformer?.name || 'No data'}
+                                            subValue={`${topPerformer?.avgTime || 0}h avg`}
                                             trend="down"
                                             trendValue="12%"
                                         />
                                         <MetricCard
                                             title="Avg Resolution Time"
-                                            value={`${overallAvg}h`}
+                                            value={`${overallAvg || 0}h`}
                                             subValue="All tickets"
                                             trend="up"
                                             trendValue="5%"
                                         />
                                         <MetricCard
                                             title="Open Tickets"
-                                            value={openTickets}
+                                            value={openTickets || 0}
                                             subValue="Pending resolution"
                                             trend="neutral"
                                             trendValue="0%"
                                         />
                                     </div>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
 
-                    <TabsContent value="locations">
-                        <Card className="bg-[#0f2a5e] border-gray-700">
-                            <CardHeader>
-                                <CardTitle className="text-white">Locations</CardTitle>
-                                <CardDescription className="text-gray-300">
-                                    Manage maintenance locations
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {locations.map((location) => (
-                                        <div
-                                            key={location.id}
-                                            className="flex items-center justify-between p-2 border border-gray-700 rounded-lg bg-[#0a1e46]"
-                                        >
-                                            <span className="text-white">{location.name}</span>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="text-gray-300 hover:text-white hover:bg-[#0a1e46]"
-                                            >
-                                                Edit
+
+
+                                <div className="grid grid-cols-2 gap-6 mt-8">
+                                    <Card className="bg-[#0f2a5e] border-gray-700">
+                                        <CardHeader>
+                                            <CardTitle className="text-white">Average Resolution Time by Staff</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="h-[400px]">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={staffPerformance}>
+                                                        <XAxis dataKey="name" stroke="#94a3b8" />
+                                                        <YAxis
+                                                            stroke="#94a3b8"
+                                                            tickFormatter={(value) => `${value}h`}
+                                                        />
+                                                        <Tooltip
+                                                            contentStyle={{ backgroundColor: '#0a1e46', border: 'none' }}
+                                                            labelStyle={{ color: 'white' }}
+                                                        />
+                                                        <Bar dataKey="avgTime" fill="#3b82f6">
+                                                            <LabelList dataKey="avgTime" position="top" fill="#94a3b8" />
+                                                        </Bar>
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card className="bg-[#0f2a5e] border-gray-700">
+                                        <CardHeader>
+                                            <CardTitle className="text-white">Monthly Resolution Trends</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="h-[400px]">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={monthlyTrends}>
+                                                        <XAxis dataKey="month" stroke="#94a3b8" />
+                                                        <YAxis stroke="#94a3b8" />
+                                                        <Tooltip
+                                                            contentStyle={{ backgroundColor: '#0a1e46', border: 'none' }}
+                                                            labelStyle={{ color: 'white' }}
+                                                        />
+                                                        <Line
+                                                            type="monotone"
+                                                            dataKey="avgResolutionTime"
+                                                            stroke="#3b82f6"
+                                                            strokeWidth={2}
+                                                        />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            </TabsContent>
+                            <TabsContent value="staff" className="mt-6">
+                                <div className="grid grid-cols-2 gap-6">
+                                    <Card className="bg-[#0f2a5e] border-gray-700">
+                                        <CardHeader>
+                                            <CardTitle className="text-white">Add Staff Member</CardTitle>
+                                            <CardDescription className="text-gray-300">
+                                                Add new maintenance staff to the system
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="space-y-2">
+                                                <Input
+                                                    placeholder="Name"
+                                                    value={newStaff.name}
+                                                    onChange={(e) => setNewStaff(prev => ({ ...prev, name: e.target.value }))}
+                                                    className="bg-[#0a1e46] border-gray-700 text-white placeholder:text-gray-400"
+                                                />
+                                                <Input
+                                                    placeholder="Department"
+                                                    value={newStaff.department}
+                                                    onChange={(e) => setNewStaff(prev => ({ ...prev, department: e.target.value }))}
+                                                    className="bg-[#0a1e46] border-gray-700 text-white placeholder:text-gray-400"
+                                                />
+                                                <Input
+                                                    placeholder="Email"
+                                                    type="email"
+                                                    value={newStaff.email}
+                                                    onChange={(e) => setNewStaff(prev => ({ ...prev, email: e.target.value }))}
+                                                    className="bg-[#0a1e46] border-gray-700 text-white placeholder:text-gray-400"
+                                                />
+                                                <Button onClick={handleAddStaff} className="w-full bg-blue-600 hover:bg-blue-700">
+                                                    Add Staff Member
+                                                </Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card className="bg-[#0f2a5e] border-gray-700">
+                                        <CardHeader>
+                                            <CardTitle className="text-white">Current Staff</CardTitle>
+                                            <CardDescription className="text-gray-300">
+                                                Manage existing staff members
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                {currentStaff.map((staff) => (
+                                                    <div
+                                                        key={staff.id}
+                                                        className="flex items-center justify-between p-2 border border-gray-700 rounded-lg bg-[#0a1e46]"
+                                                    >
+                                                        <div>
+                                                            <p className="font-medium text-white">{staff.name}</p>
+                                                            <p className="text-sm text-gray-300">{staff.department}</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm text-gray-300">
+                                                                {staff.activeTickets || 0} active tickets
+                                                            </span>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleRemoveStaff(staff.id)}
+                                                                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                                            >
+                                                                Remove
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleEditStaff(staff.id)}
+                                                                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                                            >
+                                                                Edit
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="workload" className="mt-0">
+                                <Card className="bg-[#0f2a5e] border-gray-700">
+                                    <CardHeader>
+                                        <CardTitle className="text-white">Staff Workload</CardTitle>
+                                        <CardDescription className="text-gray-300">
+                                            Current ticket distribution
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-6">
+                                            {currentStaff.map((staff) => {
+                                                const staffStats = staffPerformance.find(s => s.name === staff.name) || {
+                                                    activeTickets: 0,
+                                                    highPriorityTickets: 0,
+                                                    avgTime: 0
+                                                };
+
+                                                return (
+                                                    <div key={staff.id} className="space-y-2">
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <span className="text-sm font-medium text-white">{staff.name}</span>
+                                                                <span className="text-sm text-gray-300 ml-2">
+                                                                    ({staffStats.avgTime}h avg resolution)
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <span className="text-sm text-gray-300">
+                                                                    {staffStats.activeTickets} active
+                                                                </span>
+                                                                {staffStats.highPriorityTickets > 0 && (
+                                                                    <span className="text-sm text-red-400">
+                                                                        ({staffStats.highPriorityTickets} high priority)
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <div className="h-2 bg-[#0a1e46] rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="h-full rounded-full transition-all"
+                                                                    style={{
+                                                                        width: `${Math.min((staffStats.activeTickets / 5) * 100, 100)}%`,
+                                                                        backgroundColor: staffStats.activeTickets > 4 ? '#ef4444' : '#3b82f6'
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            {/* High Priority Bar */}
+                                                            {staffStats.highPriorityTickets > 0 && (
+                                                                <div className="h-1 bg-[#0a1e46] rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className="h-full rounded-full transition-all bg-red-400"
+                                                                        style={{
+                                                                            width: `${(staffStats.highPriorityTickets / staffStats.activeTickets) * 100}%`,
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+
+                            <TabsContent value="locations" className="mt-0">
+                                <Card className="bg-[#0f2a5e] border-gray-700">
+                                    <CardHeader>
+                                        <CardTitle className="text-white">Locations</CardTitle>
+                                        <CardDescription className="text-gray-300">
+                                            Manage maintenance locations
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-4">
+                                            {locations.map((location) => (
+                                                <div
+                                                    key={location.id}
+                                                    className="flex items-center justify-between p-2 border border-gray-700 rounded-lg bg-[#0a1e46]"
+                                                >
+                                                    <span className="text-white">{location.name}</span>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-gray-300 hover:text-white hover:bg-[#0a1e46]"
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                            <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                                                Add Location
                                             </Button>
                                         </div>
-                                    ))}
-                                    <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                                        Add Location
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
-            </SheetContent>
-        </Sheet>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        </div>
+                    </Tabs>
+                </div>
+            </DialogContent>
+        </Dialog >
     );
 }
