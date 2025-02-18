@@ -52,6 +52,12 @@ export function AdminPanel() {
         email: ''
     });
     const [locations, setLocations] = useState([]);
+    const [editingStaff, setEditingStaff] = useState(null); // Store the staff being edited
+    const [updatedStaff, setUpdatedStaff] = useState({
+        name: '',
+        department: '',
+        email: ''
+    });
 
     useEffect(() => {
         const ticketsRef = ref(database, 'tickets');
@@ -117,16 +123,32 @@ export function AdminPanel() {
             console.error('Error adding staff:', error);
         }
     };
-    const handleEditStaff = async (staffId) => {
-        if (!window.confirm('Are you sure you want to remove this staff member?')) return;
+    const handleEditStaff = (staffId) => {
+        const staffToEdit = currentStaff.find(staff => staff.id === staffId);
+        if (!staffToEdit) return;
+        setEditingStaff(staffToEdit);
+        setUpdatedStaff({
+            name: staffToEdit.name,
+            department: staffToEdit.department,
+            email: staffToEdit.email
+        });
+    };
+    const handleSaveEdit = async () => {
+        if (!editingStaff || !updatedStaff.name || !updatedStaff.department) return;
 
         try {
-            await remove(ref(database, `staff/${staffId}`));
+            const staffRef = ref(database, `staff/${editingStaff.id}`);
+            await update(staffRef, {
+                name: updatedStaff.name,
+                department: updatedStaff.department,
+                email: updatedStaff.email
+            });
+            setEditingStaff(null);
+            setUpdatedStaff({ name: '', department: '', email: '' });
         } catch (error) {
-            console.error('Error removing staff:', error);
+            console.error('Error updating staff:', error);
         }
     };
-
     const handleRemoveStaff = async (staffId) => {
         if (!window.confirm('Are you sure you want to remove this staff member?')) return;
 
@@ -449,6 +471,38 @@ export function AdminPanel() {
                                                     </div>
                                                 ))}
                                             </div>
+                                            <Dialog open={!!editingStaff} onOpenChange={(isOpen) => !isOpen && setEditingStaff(null)}>
+                                                <DialogContent className="bg-[#0a1e46] text-white">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Edit Staff Member</DialogTitle>
+                                                        <DialogDescription>Update the staff member's details below.</DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="space-y-4">
+                                                        <Input
+                                                            placeholder="Name"
+                                                            value={updatedStaff.name}
+                                                            onChange={(e) => setUpdatedStaff(prev => ({ ...prev, name: e.target.value }))}
+                                                            className="bg-[#0f2a5e] border-gray-700 text-white placeholder:text-gray-400"
+                                                        />
+                                                        <Input
+                                                            placeholder="Department"
+                                                            value={updatedStaff.department}
+                                                            onChange={(e) => setUpdatedStaff(prev => ({ ...prev, department: e.target.value }))}
+                                                            className="bg-[#0f2a5e] border-gray-700 text-white placeholder:text-gray-400"
+                                                        />
+                                                        <Input
+                                                            placeholder="Email"
+                                                            type="email"
+                                                            value={updatedStaff.email}
+                                                            onChange={(e) => setUpdatedStaff(prev => ({ ...prev, email: e.target.value }))}
+                                                            className="bg-[#0f2a5e] border-gray-700 text-white placeholder:text-gray-400"
+                                                        />
+                                                        <Button onClick={handleSaveEdit} className="w-full bg-blue-600 hover:bg-blue-700">
+                                                            Save Changes
+                                                        </Button>
+                                                    </div>
+                                                </DialogContent>
+                                            </Dialog>
                                         </CardContent>
                                     </Card>
                                 </div>
@@ -556,7 +610,8 @@ export function AdminPanel() {
                         </div>
                     </Tabs>
                 </div>
-            </DialogContent>
+            </DialogContent >
         </Dialog >
+
     );
 }
