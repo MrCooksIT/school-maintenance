@@ -28,17 +28,14 @@
 
   .dark {
     --background: 217 71% 16%;
-    /* Your #0a1e46 in HSL */
     --foreground: 0 0% 100%;
     --card: 217 71% 16%;
     --card-foreground: 0 0% 100%;
     --popover: 217 71% 16%;
     --popover-foreground: 0 0% 100%;
     --primary: 217 53% 27%;
-    /* Your #1e3a6b in HSL */
     --primary-foreground: 0 0% 100%;
     --secondary: 217 45% 35%;
-    /* Your #2d4d85 in HSL */
     --secondary-foreground: 0 0% 100%;
     --muted: 217 53% 27%;
     --muted-foreground: 217 20% 80%;

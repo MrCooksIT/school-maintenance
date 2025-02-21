@@ -395,7 +395,7 @@ const MaintenanceDashboard = () => {
   };
 
   return (
-    <div className="p-6 mt-16"> {/* Added mt-16 to account for fixed header */}
+    <div className="p-6"> 
       <div className="mb-6">
         {/* Filter Section */}
         <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow-sm">
