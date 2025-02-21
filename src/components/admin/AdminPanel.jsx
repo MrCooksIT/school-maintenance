@@ -471,38 +471,7 @@ export function AdminPanel() {
                                                     </div>
                                                 ))}
                                             </div>
-                                            <Dialog open={!!editingStaff} onOpenChange={(isOpen) => !isOpen && setEditingStaff(null)}>
-                                                <DialogContent className="bg-[#0a1e46] text-white">
-                                                    <DialogHeader>
-                                                        <DialogTitle>Edit Staff Member</DialogTitle>
-                                                        <DialogDescription>Update the staff member's details below.</DialogDescription>
-                                                    </DialogHeader>
-                                                    <div className="space-y-4">
-                                                        <Input
-                                                            placeholder="Name"
-                                                            value={updatedStaff.name}
-                                                            onChange={(e) => setUpdatedStaff(prev => ({ ...prev, name: e.target.value }))}
-                                                            className="bg-[#0f2a5e] border-gray-700 text-white placeholder:text-gray-400"
-                                                        />
-                                                        <Input
-                                                            placeholder="Department"
-                                                            value={updatedStaff.department}
-                                                            onChange={(e) => setUpdatedStaff(prev => ({ ...prev, department: e.target.value }))}
-                                                            className="bg-[#0f2a5e] border-gray-700 text-white placeholder:text-gray-400"
-                                                        />
-                                                        <Input
-                                                            placeholder="Email"
-                                                            type="email"
-                                                            value={updatedStaff.email}
-                                                            onChange={(e) => setUpdatedStaff(prev => ({ ...prev, email: e.target.value }))}
-                                                            className="bg-[#0f2a5e] border-gray-700 text-white placeholder:text-gray-400"
-                                                        />
-                                                        <Button onClick={handleSaveEdit} className="w-full bg-blue-600 hover:bg-blue-700">
-                                                            Save Changes
-                                                        </Button>
-                                                    </div>
-                                                </DialogContent>
-                                            </Dialog>
+
                                         </CardContent>
                                     </Card>
                                 </div>
@@ -610,7 +579,7 @@ export function AdminPanel() {
                         </div>
                     </Tabs>
                 </div>
-            </DialogContent >
+            </DialogContent>
         </Dialog >
 
     );
