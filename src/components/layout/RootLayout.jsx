@@ -40,8 +40,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
             </div>
 
-            Let's fix the routing in your RootLayout. The paths in your navigation need to start with "/" to work correctly. Here's the corrected navigation section:
-            jsxCopy<nav className="flex-1 px-2">
+            <nav className="flex-1 px-2">
                 {[
                     { name: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" />, path: '/' },
                     { name: 'Jobs', icon: <ClipboardList className="h-5 w-5" />, path: '/admin/jobs' },
@@ -55,8 +54,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         key={item.path}
                         to={item.path}
                         className={`flex items-center gap-3 px-4 py-2 mt-1 rounded-lg text-sm ${isActiveRoute(item.path)
-                                ? 'bg-blue-600 text-white'
-                                : 'text-gray-300 hover:bg-blue-700/50'
+                            ? 'bg-blue-600 text-white'
+                            : 'text-gray-300 hover:bg-blue-700/50'
                             }`}
                     >
                         {item.icon}

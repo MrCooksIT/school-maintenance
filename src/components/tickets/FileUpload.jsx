@@ -165,7 +165,10 @@ export function FileUpload({ ticketId }) {
 
             <div className="space-y-2">
                 {files.map((file) => (
-                    <div key={file.id} className="bg-[#0f2a5e] p-4 rounded-lg border border-gray-700">
+                    <div
+                        key={file.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                    >
                         <div className="flex items-center gap-3">
                             {getFileIcon(file.type)}
                             <div>

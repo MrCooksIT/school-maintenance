@@ -1,4 +1,4 @@
-import { TicketDetailView } from './tickets/TicketDetailView';
+import TicketDetailsModal from './tickets/TicketDetailsModal';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import React, { useState, useEffect } from 'react';
 import { ref, onValue, update } from 'firebase/database';
@@ -294,17 +294,7 @@ const MaintenanceDashboard = () => {
     from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
     to: new Date()
   });
-  const [isEditing, setIsEditing] = useState({
-    subject: false,
-    description: false
-  });
-  const [editedData, setEditedData] = useState({});
 
-  useEffect(() => {
-    if (selectedTicket) {
-      setEditedData(selectedTicket);
-    }
-  }, [selectedTicket]);
   const handleUpdate = async (field, value) => {
     try {
       const ticketRef = ref(database, `tickets/${selectedTicket.id}`);
@@ -395,7 +385,7 @@ const MaintenanceDashboard = () => {
   };
 
   return (
-    <div className="p-6"> 
+    <div className="p-6">
       <div className="mb-6">
         {/* Filter Section */}
         <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow-sm">
@@ -428,15 +418,17 @@ const MaintenanceDashboard = () => {
               className="max-w-xs"
             />
 
-            <Button
-              variant="outline"
-              className="flex items-center gap-2"
-              onClick={handleClearFilters}
-            >
-              <AdminPanel></AdminPanel>
-              <Filter className="h-4 w-4" />
-              Clear Filters
-            </Button>
+            <div className="flex gap-2">
+              <AdminPanel />
+              <Button
+                variant="outline"
+                className="flex items-center gap-2"
+                onClick={handleClearFilters}
+              >
+                <Filter className="h-4 w-4" />
+                Clear Filters
+              </Button>
+            </div>
 
           </div>
         </div>
@@ -477,184 +469,12 @@ const MaintenanceDashboard = () => {
           </table>
         </div>
 
-        <Dialog open={commentModalOpen} onOpenChange={setCommentModalOpen}>
-          <DialogContent className="max-w-4xl min-h-[600px] bg-white text-gray-800 p-6">
-            <DialogHeader>
-              <DialogTitle>Ticket Details</DialogTitle>
-              <DialogDescription>
-                View and edit ticket information
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <span className="text-xl font-semibold text-marist">{selectedTicket?.ticketId}</span>
-                <div className="flex gap-2">
-                  <Select
-                    value={selectedTicket?.priority}
-                    onValueChange={(value) => handleQuickUpdate(selectedTicket?.id, 'priority', value)}
-                  >
-                    <SelectTrigger className="border-none p-0 h-auto bg-transparent">
-                      <Badge className={getPriorityStyle(selectedTicket?.priority)}>
-                        {selectedTicket?.priority?.toUpperCase()}
-                      </Badge>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PRIORITY_OPTIONS.map((priority) => (
-                        <SelectItem key={priority.value} value={priority.value}>
-                          {priority.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select
-                    value={selectedTicket?.status}
-                    onValueChange={(value) => handleQuickUpdate(selectedTicket?.id, 'status', value)}
-                  >
-                    <SelectTrigger className="border-none p-0 h-auto bg-transparent">
-                      <Badge variant="outline">{selectedTicket?.status}</Badge>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((status) => (
-                        <SelectItem key={status.value} value={status.value}>
-                          {status.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogClose>
-                <X className="h-5 w-5 text-gray-500 hover:text-gray-700" />
-              </DialogClose>
-            </div>
-
-            <Tabs defaultValue="details" className="h-[calc(100%-4rem)]">
-              <TabsList className="bg-[#1E3A6B] w-full flex space-x-2 p-1 rounded-lg mb-4">
-                <TabsTrigger
-                  value="details"
-                  className="flex-1 py-2 text-white data-[state=active]:bg-[#12327A]"
-                >
-                  Details
-                </TabsTrigger>
-                <TabsTrigger
-                  value="comments"
-                  className="flex-1 py-2 text-white data-[state=active]:bg-[#12327A]"
-                >
-                  Comments
-                </TabsTrigger>
-                <TabsTrigger
-                  value="files"
-                  className="flex-1 py-2 text-white data-[state=active]:bg-[#12327A]"
-                >
-                  Files
-                </TabsTrigger>
-              </TabsList>
-
-              <div className="h-[calc(100%-3rem)] overflow-y-auto custom-scrollbar">
-                <TabsContent value="details" className="mt-0 space-y-4">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold mb-4 text-marist">Ticket Information</h3>
-                    <div className="space-y-4">
-                      <div className="group relative">
-                        <label className="text-sm text-gray-600">Subject</label>
-                        {isEditing.subject ? (
-                          <div className="flex gap-2 mt-1">
-                            <Input
-                              value={editedData.subject}
-                              onChange={(e) => setEditedData(prev => ({ ...prev, subject: e.target.value }))}
-                              className="flex-1"
-                            />
-                            <Button size="sm" onClick={() => handleUpdate('subject', editedData.subject)}>
-                              <Save className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setIsEditing({ ...isEditing, subject: false })}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="mt-1 relative">
-                            <p className="text-lg">{selectedTicket?.subject}</p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100"
-                              onClick={() => setIsEditing({ ...isEditing, subject: true })}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="group relative">
-                        <label className="text-sm text-gray-600">Description</label>
-                        {isEditing.description ? (
-                          <div className="flex gap-2 mt-1">
-                            <Textarea
-                              value={editedData.description}
-                              onChange={(e) => setEditedData(prev => ({ ...prev, description: e.target.value }))}
-                              className="flex-1"
-                              rows={4}
-                            />
-                            <div className="flex flex-col gap-2">
-                              <Button size="sm" onClick={() => handleUpdate('description', editedData.description)}>
-                                <Save className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setIsEditing({ ...isEditing, description: false })}>
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-1 relative">
-                            <p className="whitespace-pre-wrap">{selectedTicket?.description}</p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100"
-                              onClick={() => setIsEditing({ ...isEditing, description: true })}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-[#1E3A6B] rounded-lg p-4">
-                    <h3 className="text-lg font-semibold mb-4">Assignment</h3>
-                    <Select
-                      value={selectedTicket?.assignedTo || "unassigned"}
-                      onValueChange={(value) => handleQuickUpdate(selectedTicket?.id, 'assignedTo', value === 'unassigned' ? null : value)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Assign to staff member..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {staffMembers.map((staff) => (
-                          <SelectItem key={staff.id} value={staff.id}>
-                            {staff.name} - {staff.department}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="comments" className="mt-0">
-                  <TicketComments ticketId={selectedTicket?.id} />
-                </TabsContent>
-
-                <TabsContent value="files" className="mt-0">
-                  <FileUpload ticketId={selectedTicket?.id} />
-                </TabsContent>
-              </div>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
+        <TicketDetailsModal
+          ticket={selectedTicket}
+          isOpen={commentModalOpen}
+          onClose={() => setCommentModalOpen(false)}
+          staffMembers={staffMembers}
+        />
       </div>
     </div>
   );
