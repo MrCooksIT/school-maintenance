@@ -10,13 +10,13 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-    User, 
-    Clock, 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar.jsx";
+import {
+    User,
+    Clock,
     AlertCircle,
     CheckCircle,
-    AlertTriangle 
+    AlertTriangle
 } from 'lucide-react';
 
 const Jobs = () => {
@@ -94,7 +94,7 @@ const Jobs = () => {
         <div className="space-y-6">
             {staff.map((member) => {
                 const workload = getStaffWorkload(member.id);
-                
+
                 return (
                     <Card key={member.id}>
                         <CardHeader>
@@ -131,8 +131,8 @@ const Jobs = () => {
                                 {workload.tickets
                                     .filter(ticket => ticket.status !== 'completed')
                                     .map(ticket => (
-                                        <div 
-                                            key={ticket.id} 
+                                        <div
+                                            key={ticket.id}
                                             className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
                                         >
                                             <div className="space-y-1">
