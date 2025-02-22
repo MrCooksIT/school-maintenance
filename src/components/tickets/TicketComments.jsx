@@ -5,7 +5,7 @@ import { database, auth } from '@/config/firebase';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
 import { format } from 'date-fns';
-import { useAuthState } from 'react-firebase-hooks/auth'; // Install this package if not already installed
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 export function TicketComments({ ticketId }) {
     const [comments, setComments] = useState([]);
