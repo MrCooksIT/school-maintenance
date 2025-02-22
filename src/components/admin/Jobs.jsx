@@ -10,7 +10,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar.jsx";
+import { Avatar, AvatarFallback } from "@/components/ui/Avatar";
 import {
     User,
     Clock,
