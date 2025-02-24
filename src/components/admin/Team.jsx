@@ -12,10 +12,24 @@ import {
     CardHeader,
     CardTitle,
 } from "@/components/ui/card";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription
+} from "@/components/ui/dialog";
 
-export function Team() {
+const Team = () => {
     const [currentStaff, setCurrentStaff] = useState([]);
     const [newStaff, setNewStaff] = useState({
+        name: '',
+        department: '',
+        email: ''
+    });
+    const [editingStaff, setEditingStaff] = useState(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [updatedStaff, setUpdatedStaff] = useState({
         name: '',
         department: '',
         email: ''
@@ -53,7 +67,21 @@ export function Team() {
             console.error('Error adding staff:', error);
         }
     };
-
+    const handleEditStaff = async () => {
+        if (!editingStaff) return;
+        try {
+            const staffRef = ref(database, `staff/${editingStaff.id}`);
+            await update(staffRef, {
+                ...updatedStaff,
+                updatedAt: new Date().toISOString()
+            });
+            setEditingStaff(null);
+            setIsEditModalOpen(false);
+            setUpdatedStaff({ name: '', department: '', email: '' });
+        } catch (error) {
+            console.error('Error updating staff:', error);
+        }
+    };
     const handleRemoveStaff = async (staffId) => {
         if (!window.confirm('Are you sure you want to remove this staff member?')) return;
 
@@ -118,9 +146,21 @@ export function Team() {
                                         <p className="text-sm text-muted-foreground">{staff.department}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm text-muted-foreground">
-                                            {staff.activeTickets || 0} active tickets
-                                        </span>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                setEditingStaff(staff);
+                                                setUpdatedStaff({
+                                                    name: staff.name,
+                                                    department: staff.department,
+                                                    email: staff.email
+                                                });
+                                                setIsEditModalOpen(true);
+                                            }}
+                                        >
+                                            Edit
+                                        </Button>
                                         <Button
                                             variant="ghost"
                                             size="sm"
@@ -130,6 +170,41 @@ export function Team() {
                                             <X className="h-4 w-4" />
                                         </Button>
                                     </div>
+
+                                    {/* Edit Staff Modal */}
+                                    <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Edit Staff Member</DialogTitle>
+                                            </DialogHeader>
+                                            <div className="space-y-4">
+                                                <Input
+                                                    placeholder="Name"
+                                                    value={updatedStaff.name}
+                                                    onChange={(e) => setUpdatedStaff(prev => ({ ...prev, name: e.target.value }))}
+                                                />
+                                                <Input
+                                                    placeholder="Department"
+                                                    value={updatedStaff.department}
+                                                    onChange={(e) => setUpdatedStaff(prev => ({ ...prev, department: e.target.value }))}
+                                                />
+                                                <Input
+                                                    placeholder="Email"
+                                                    type="email"
+                                                    value={updatedStaff.email}
+                                                    onChange={(e) => setUpdatedStaff(prev => ({ ...prev, email: e.target.value }))}
+                                                />
+                                                <div className="flex justify-end gap-2">
+                                                    <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                                                        Cancel
+                                                    </Button>
+                                                    <Button onClick={handleEditStaff}>
+                                                        Save Changes
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
                                 </div>
                             ))}
                         </div>

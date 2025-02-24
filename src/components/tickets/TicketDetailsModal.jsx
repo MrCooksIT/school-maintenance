@@ -1,6 +1,6 @@
 // src/components/tickets/TicketDetailsModal.jsx
 import React, { useState, useEffect } from 'react';
-import { ref, update } from 'firebase/database';
+import { ref, onValue, update } from 'firebase/database';
 import { database } from '@/config/firebase';
 import {
   Dialog,
@@ -9,9 +9,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Select,
   SelectContent,
@@ -20,9 +20,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Edit2, Save, X, MessageSquare, FileText } from 'lucide-react';
+import { MessageSquare, X } from 'lucide-react';
+import { Textarea } from "@/components/ui/textarea";
 import { TicketComments } from './TicketComments';
 import { FileUpload } from './FileUpload';
+
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
@@ -36,6 +38,31 @@ const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low' }
 ];
 
+const handleSaveAll = async () => {
+  try {
+    const ticketRef = ref(database, `tickets/${ticket.id}`);
+    await update(ticketRef, {
+      ...editedData,
+      lastUpdated: new Date().toISOString()
+    });
+
+    // Show success toast if you have it set up
+    toast({
+      title: "Changes saved",
+      description: "Ticket has been updated successfully",
+    });
+
+    onClose(); // Close the modal after saving
+  } catch (error) {
+    console.error('Error saving ticket:', error);
+    // Show error toast if you have it set up
+    toast({
+      title: "Error",
+      description: "Failed to save changes",
+      variant: "destructive",
+    });
+  }
+};
 const getPriorityStyle = (priority) => {
   const styles = {
     high: "bg-red-900/50 text-red-200 border-red-800",
@@ -46,13 +73,88 @@ const getPriorityStyle = (priority) => {
 };
 
 const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
-  const [editedData, setEditedData] = useState(ticket || {});
+  const { toast } = useToast();
+  const handleSaveAll = async () => {
+    if (!editedData.id) return;
+    try {
+      const ticketRef = ref(database, `tickets/${editedData.id}`); // Use editedData instead of ticket
+      await update(ticketRef, {
+        ...editedData,
+        lastUpdated: new Date().toISOString()
+      });
 
+      toast({
+        title: "Changes saved",
+        description: "Ticket has been updated successfully",
+      });
+
+      onClose();
+    } catch (error) {
+      console.error('Error saving ticket:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save changes",
+        variant: "destructive",
+      });
+    }
+  };
+  const [editedData, setEditedData] = useState({
+    priority: 'low',
+    status: 'new',
+    subject: '',
+    description: '',
+    location: '',
+    category: '',
+    assignedTo: null,
+  });
+  const [categories, setCategories] = useState([]);
+  const [locations, setLocations] = useState([]);
+
+  // Update editedData when ticket changes
   useEffect(() => {
     if (ticket) {
-      setEditedData(ticket);
+      setEditedData({
+        priority: 'low',
+        status: 'new',
+        subject: '',
+        description: '',
+        location: '',
+        category: '',
+        assignedTo: null,
+        ...ticket
+      });
     }
   }, [ticket]);
+
+  useEffect(() => {
+    const categoriesRef = ref(database, 'categories');
+    const locationsRef = ref(database, 'locations');
+
+    const unsubscribeCategories = onValue(categoriesRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const categoriesData = Object.entries(snapshot.val()).map(([id, data]) => ({
+          id,
+          ...data
+        }));
+        setCategories(categoriesData);
+      }
+    });
+
+    const unsubscribeLocations = onValue(locationsRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const locationsData = Object.entries(snapshot.val()).map(([id, data]) => ({
+          id,
+          ...data
+        }));
+        setLocations(locationsData);
+      }
+    });
+
+    return () => {
+      unsubscribeCategories();
+      unsubscribeLocations();
+    };
+  }, []);
 
   const handleQuickUpdate = async (field, value) => {
     try {
@@ -67,36 +169,29 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
     }
   };
 
+  // Guard clause
   if (!ticket) return null;
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-full max-w-[90vw] md:max-w-4xl lg:max-w-5xl p-4 md:p-6 bg-white">
         <DialogHeader className="border-b bg-[#1E3A6B] text-white">
           <div className="flex items-center justify-between p-6 border-b bg-[#1E3A6B] text-white">
             <div className="flex items-right space-x-20">
-              <span className="text-3xl font-semibold">{ticket.ticketId}</span>
+              <span className="text-3xl font-semibold">{editedData?.ticketId}</span>
               <div className="flex items-center gap-4">
                 <Select
-                  value={editedData.priority}
+                  value={editedData?.priority || 'low'}
                   onValueChange={(value) => handleQuickUpdate('priority', value)}
                 >
                   <SelectTrigger className="border-0 bg-[#1E3A6B] transition-colors min-h-5 h-auto p-0 w-auto">
-                    <Badge className={getPriorityStyle(editedData.priority)}>
-                      {editedData.priority?.toUpperCase()}
-
+                    <Badge className={getPriorityStyle(editedData?.priority || 'low')}>
+                      {(editedData?.priority || 'low').toUpperCase()}
                     </Badge>
                   </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-md rounded-md">
+                  <SelectContent>
                     {PRIORITY_OPTIONS.map((priority) => (
-                      <SelectItem
-                        key={priority.value}
-                        value={priority.value}
-                        className="hover:bg-gray-100 cursor-pointer"
-                      >
-                        <Badge className={getPriorityStyle(priority.value)}>
-                          {priority.label.toUpperCase()}
-                        </Badge>
+                      <SelectItem key={priority.value} value={priority.value}>
+                        {priority.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -193,15 +288,37 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">
-                        Location
-                      </label>
-                      <Input
-                        value={editedData.location}
-                        onChange={(e) => handleQuickUpdate('location', e.target.value)}
-                        className="w-full bg-white"
-                        placeholder="Enter location"
-                      />
+                      <Select
+                        value={editedData.location || ""}
+                        onValueChange={(value) => handleQuickUpdate('location', value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select location" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              {location.name} - {location.building}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Select
+                        value={editedData.category || ""}
+                        onValueChange={(value) => handleQuickUpdate('category', value)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -239,18 +356,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                         value={editedData.dueDate || ''}
                         onChange={(e) => handleQuickUpdate('dueDate', e.target.value)}
                         className="w-full bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">
-                        Category
-                      </label>
-                      <Input
-                        value={editedData.category || ''}
-                        onChange={(e) => handleQuickUpdate('category', e.target.value)}
-                        className="w-full bg-white"
-                        placeholder="Enter category"
                       />
                     </div>
 
@@ -305,8 +410,23 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
             </TabsContent>
           </div>
         </Tabs>
+        <div className="flex justify-end gap-4 mt-4 border-t pt-4">
+          <Button
+            variant="outline"
+            onClick={onClose}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveAll}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Save Changes
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
+
   );
 };
 

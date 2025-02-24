@@ -13,7 +13,8 @@ import {
     Activity,
     BarChart4,
     Drill,
-    Wrench
+    Wrench,
+    FolderOpen
 } from 'lucide-react';
 
 // Sidebar Toggle Button Component
@@ -48,6 +49,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                     { name: 'Tasks', icon: <CalendarDays className="h-5 w-5" />, path: '/admin/calendar' },
                     { name: 'Workload', icon: <Activity className="h-5 w-5" />, path: '/admin/workload' },
                     { name: 'Locations', icon: <MapPin className="h-5 w-5" />, path: '/admin/locations' },
+                    {
+                        name: 'Categories', icon: <FolderOpen className="h-5 w-5" />, path: '/admin/categories'
+                    },
                     { name: 'Team', icon: <Users className="h-5 w-5" />, path: '/admin/team' },
                 ].map((item) => (
                     <Link
@@ -100,7 +104,7 @@ const Header = ({ toggleSidebar }) => (
 );
 
 const RootLayout = ({ children }) => {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const toggleSidebar = () => {
         setIsSidebarOpen((prev) => !prev);

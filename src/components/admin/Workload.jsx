@@ -1,7 +1,9 @@
 // src/components/admin/Workload.jsx
+// src/components/admin/Workload.jsx
 import React, { useState, useEffect } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { database } from '@/config/firebase';
+import { cn } from "@/lib/utils";
 import {
     Card,
     CardContent,
@@ -10,6 +12,14 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import {
     AlertCircle,
     Clock,
@@ -29,6 +39,50 @@ const Workload = () => {
     const [tickets, setTickets] = useState([]);
     const [staff, setStaff] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [hideEmpty, setHideEmpty] = useState(false);
+    const [sortBy, setSortBy] = useState('name');
+
+    // Move these functions OUTSIDE of useEffect
+    const calculateWorkloadScore = (tickets) => {
+        return tickets.reduce((score, ticket) => {
+            let value = 1;
+            if (ticket.priority === 'high') value += 2;
+            if (ticket.priority === 'medium') value += 1;
+            if (ticket.dueDate) {
+                const dueDate = new Date(ticket.dueDate);
+                const today = new Date();
+                const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+                if (diffDays <= 1) value += 3;
+                else if (diffDays <= 3) value += 2;
+                else if (diffDays <= 7) value += 1;
+            }
+            return score + value;
+        }, 0);
+    };
+
+    const calculateWorkload = (staffMember) => {
+        const staffTickets = tickets.filter(ticket => ticket.assignedTo === staffMember.id);
+        const activeTickets = staffTickets.filter(t => t.status !== 'completed');
+        const completedTickets = staffTickets.filter(t => t.status === 'completed');
+        const highPriorityTickets = activeTickets.filter(t => t.priority === 'high');
+        const dueSoonTickets = activeTickets.filter(t => {
+            if (!t.dueDate) return false;
+            const dueDate = new Date(t.dueDate);
+            const today = new Date();
+            const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+            return diffDays <= 3;
+        });
+
+        return {
+            total: staffTickets.length,
+            active: activeTickets.length,
+            completed: completedTickets.length,
+            highPriority: highPriorityTickets.length,
+            dueSoon: dueSoonTickets.length,
+            tickets: activeTickets,
+            workloadScore: calculateWorkloadScore(activeTickets)
+        };
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -65,47 +119,23 @@ const Workload = () => {
 
         fetchData();
     }, []);
+    const sortedAndFilteredStaff = staff
+        .filter(member => !hideEmpty || calculateWorkload(member).active > 0)
+        .sort((a, b) => {
+            const workloadA = calculateWorkload(a);
+            const workloadB = calculateWorkload(b);
 
-    const calculateWorkload = (staffMember) => {
-        const staffTickets = tickets.filter(ticket => ticket.assignedTo === staffMember.id);
-        const activeTickets = staffTickets.filter(t => t.status !== 'completed');
-        const completedTickets = staffTickets.filter(t => t.status === 'completed');
-        const highPriorityTickets = activeTickets.filter(t => t.priority === 'high');
-        const dueSoonTickets = activeTickets.filter(t => {
-            if (!t.dueDate) return false;
-            const dueDate = new Date(t.dueDate);
-            const today = new Date();
-            const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-            return diffDays <= 3;
-        });
-
-        return {
-            total: staffTickets.length,
-            active: activeTickets.length,
-            completed: completedTickets.length,
-            highPriority: highPriorityTickets.length,
-            dueSoon: dueSoonTickets.length,
-            tickets: activeTickets,
-            workloadScore: calculateWorkloadScore(activeTickets)
-        };
-    };
-
-    const calculateWorkloadScore = (tickets) => {
-        return tickets.reduce((score, ticket) => {
-            let value = 1;
-            if (ticket.priority === 'high') value += 2;
-            if (ticket.priority === 'medium') value += 1;
-            if (ticket.dueDate) {
-                const dueDate = new Date(ticket.dueDate);
-                const today = new Date();
-                const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-                if (diffDays <= 1) value += 3;
-                else if (diffDays <= 3) value += 2;
-                else if (diffDays <= 7) value += 1;
+            switch (sortBy) {
+                case 'workload':
+                    return workloadB.workloadScore - workloadA.workloadScore;
+                case 'active':
+                    return workloadB.active - workloadA.active;
+                case 'priority':
+                    return workloadB.highPriority - workloadA.highPriority;
+                default:
+                    return a.name.localeCompare(b.name);
             }
-            return score + value;
-        }, 0);
-    };
+        });
 
     const getWorkloadStatus = (score) => {
         if (score <= 5) return { label: 'Light', color: 'bg-green-100 text-green-800' };
@@ -123,10 +153,35 @@ const Workload = () => {
 
     return (
         <div className="p-6 space-y-6">
-            <h1 className="text-2xl font-bold mb-6">Staff Workload Distribution</h1>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold">Staff Workload Distribution</h1>
+                <div className="flex gap-4">
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Sort by..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="name">Name</SelectItem>
+                            <SelectItem value="workload">Workload</SelectItem>
+                            <SelectItem value="active">Active Tickets</SelectItem>
+                            <SelectItem value="priority">High Priority</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Button
+                        variant="outline"
+                        onClick={() => setHideEmpty(!hideEmpty)}
+                        className={cn(
+                            "transition-colors",
+                            hideEmpty && "bg-blue-100 border-blue-200 text-blue-900"
+                        )}
+                    >
+                        {hideEmpty ? "Show All Staff" : "Hide Inactive Staff"}
+                    </Button>
+                </div>
+            </div>
 
             <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-                {staff.map((member) => {
+                {sortedAndFilteredStaff.map((member) => {
                     const workload = calculateWorkload(member);
                     const workloadStatus = getWorkloadStatus(workload.workloadScore);
 

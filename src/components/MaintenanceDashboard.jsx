@@ -1,23 +1,12 @@
 import TicketDetailsModal from './tickets/TicketDetailsModal';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import React, { useState, useEffect } from 'react';
 import { ref, onValue, update } from 'firebase/database';
 import { database } from '@/config/firebase';
-import { DateRangePicker } from './DateRangePicker';
 import {
   Filter,
-  Calendar,
   MoreVertical,
-  CheckCircle2,
-  Clock,
-  X,
   MessageSquare,
-  Edit2,
-  Save,
-  Building,
-  User
 } from 'lucide-react';
-import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
@@ -28,43 +17,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { TicketComments } from './tickets/TicketComments';
-import { FileUpload } from './tickets/FileUpload';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogClose
-} from './ui/dialog';
-import { AdminPanel } from './admin/AdminPanel';
+import { RefreshCw } from 'lucide-react';
+import { useToast } from "@/components/ui/use-toast"
 
 // Constants
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
   { value: 'in-progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' }
+  { value: 'completed', label: 'Completed' },
+  { value: 'overdue', label: 'Overdue' }
 ];
-const getPriorityStyle = (priority) => {
-  const styles = {
-    high: "bg-red-900/50 text-red-200 border-red-800",
-    medium: "bg-yellow-900/50 text-yellow-200 border-yellow-800",
-    low: "bg-green-900/50 text-green-200 border-green-800"
-  };
-  return styles[priority] || styles.medium;
-};
+//
 const PRIORITY_OPTIONS = [
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' }
 ];
-// Badge Components
+//Status
 const StatusBadge = ({ status }) => {
   const statusStyles = {
     new: "bg-blue-100 text-blue-800 border-blue-200",
     "in-progress": "bg-yellow-100 text-yellow-800 border-yellow-200",
-    completed: "bg-green-100 text-green-800 border-green-200"
+    completed: "bg-green-100 text-green-800 border-green-200",
+    overdue: "bg-Red-100 text-Red-800 border-Red-200"
   };
 
   return (
@@ -89,222 +64,135 @@ const PriorityBadge = ({ priority }) => {
 };
 
 // TicketRow Component
+
 const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
   const [editedData, setEditedData] = useState(ticket);
-  const [isEditing, setIsEditing] = useState(false);
-  const handleCellEdit = (field, value) => {
-    setEditedData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleSave = async () => {
-    try {
-      const ticketRef = ref(database, `tickets/${ticket.id}`);
-      await update(ticketRef, {
-        ...editedData,
-        lastUpdated: new Date().toISOString()
-      });
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating ticket:', error);
-    }
-  };
-  const handleQuickUpdate = async (field, value) => {
-    try {
-      const ticketRef = ref(database, `tickets/${ticket.id}`);
-      const updates = {
-        [field]: value,
-        lastUpdated: new Date().toISOString()
-      };
-
-      if (field === 'status' && value === 'completed') {
-        updates.completedAt = new Date().toISOString();
-      }
-
-      await update(ticketRef, updates);
-      setEditedData(prev => ({ ...prev, ...updates }));
-    } catch (error) {
-      console.error('Error updating ticket:', error);
-    }
-  };
   return (
-    <tr className="hover:bg-gray-50 cursor-pointer">
-      <td className="px-4 py-2 text-sm">
-        {typeof editedData.requester === 'object'
-          ? `${editedData.requester.name || ''} ${editedData.requester.surname || ''}`
-          : editedData.requester}
-      </td>
+    <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => onTicketClick(ticket)}>
+        <td className="px-4 py-2 text-sm">
+            {typeof ticket.requester === 'object'
+                ? `${ticket.requester.name || ''} ${ticket.requester.surname || ''}`
+                : ticket.requester}
+        </td>
 
-      <td className="px-4 py-2 text-sm">
-        {isEditing ? (
-          <Input
-            type="date"
-            value={editedData.dueDate || ''}
-            onChange={(e) => handleCellEdit('dueDate', e.target.value)}
-            className="h-8"
-          />
-        ) : (
-          editedData.dueDate || 'No due date'
-        )}
-      </td>
+        <td className="px-4 py-2 text-sm">
+            {ticket.dueDate || 'No due date'}
+        </td>
 
-      <td className="px-4 py-2 text-sm font-mono">{editedData.ticketId}</td>
+        <td className="px-4 py-2 text-sm font-mono">{ticket.ticketId}</td>
 
-      <td className="px-4 py-2">
-        <div className="cursor-pointer" onClick={(e) => e.stopPropagation()}>
-          <Select
-            value={editedData.status}
-            onValueChange={(value) => handleQuickUpdate('status', value)}
-          >
-            <SelectTrigger className="border-none p-0 h-auto bg-transparent">
-              <StatusBadge status={editedData.status} />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((status) => (
-                <SelectItem key={status.value} value={status.value}>
-                  {status.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </td>
+        <td className="px-4 py-2">
+            <StatusBadge status={ticket.status} />
+        </td>
 
-      <td className="px-4 py-2 text-sm">
-        {isEditing ? (
-          <Input
-            value={editedData.subject}
-            onChange={(e) => handleCellEdit('subject', e.target.value)}
-            className="h-8"
-          />
-        ) : (
-          editedData.subject
-        )}
-      </td>
+        <td className="px-4 py-2 text-sm">
+            {ticket.subject}
+        </td>
 
-      <td className="px-4 py-2 text-sm">
-        {isEditing ? (
-          <Input
-            value={editedData.description}
-            onChange={(e) => handleCellEdit('description', e.target.value)}
-            className="h-8"
-          />
-        ) : (
-          editedData.description
-        )}
-      </td>
+        <td className="px-4 py-2 text-sm">
+            {ticket.description}
+        </td>
 
-      <td className="px-4 py-2">
-        <div className="cursor-pointer" onClick={(e) => e.stopPropagation()}>
-          <Select
-            value={editedData.priority}
-            onValueChange={(value) => handleQuickUpdate('priority', value)}
-          >
-            <SelectTrigger className="border-none p-0 h-auto bg-transparent">
-              <PriorityBadge priority={editedData.priority} />
-            </SelectTrigger>
-            <SelectContent>
-              {PRIORITY_OPTIONS.map((priority) => (
-                <SelectItem key={priority.value} value={priority.value}>
-                  {priority.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </td>
-      <td className="px-4 py-2">
-        <div className="cursor-pointer" onClick={(e) => e.stopPropagation()}>
-          <Select
-            value={editedData.assignedTo || "unassigned"}
-            onValueChange={(value) =>
-              handleQuickUpdate('assignedTo', value === 'unassigned' ? null : value)
-            }
-          >
-            <SelectTrigger className="border-none p-0 h-auto bg-transparent">
-              <div className="flex items-center gap-2">
-                {editedData.assignedTo ? (
-                  <Badge variant="outline">
-                    {staffMembers.find(s => s.id === editedData.assignedTo)?.name || 'Unknown'}
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary">Unassigned</Badge>
-                )}
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unassigned">Unassigned</SelectItem>
-              {staffMembers.map((staff) => (
-                <SelectItem key={staff.id} value={staff.id}>
-                  {staff.name} - {staff.department}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </td>
+        <td className="px-4 py-2">
+            <PriorityBadge priority={ticket.priority} />
+        </td>
 
-      <td className="px-4 py-2 text-sm">
-        {editedData.completedAt ? (
-          new Date(editedData.completedAt).toLocaleString('en-GB', {
-            dateStyle: 'medium',
-            timeStyle: 'short'
-          })
-        ) : (
-          '-'
-        )}
-      </td>
+        <td className="px-4 py-2">
+            {ticket.assignedTo ? (
+                <Badge variant="outline">
+                    {staffMembers.find(s => s.id === ticket.assignedTo)?.name || 'Unknown'}
+                </Badge>
+            ) : (
+                <Badge variant="secondary">Unassigned</Badge>
+            )}
+        </td>
 
-      <td className="px-4 py-2">
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onTicketClick(ticket)}
-          >
-            <MessageSquare className="h-4 w-4" />
-          </Button>
-          {isEditing ? (
-            <>
-              <Button size="sm" variant="ghost" onClick={handleSave}>
-                Save
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
-              <MoreVertical className="h-4 w-4" />
+        <td className="px-4 py-2 text-sm">
+            {ticket.completedAt ? (
+                new Date(ticket.completedAt).toLocaleString('en-GB', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short'
+                })
+            ) : (
+                '-'
+            )}
+        </td>
+
+        <td className="px-4 py-2">
+            <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onTicketClick(ticket);
+                }}
+            >
+                <MessageSquare className="h-4 w-4" />
             </Button>
-          )}
-        </div>
-      </td>
+        </td>
     </tr>
-  );
+);
 };
 
 const MaintenanceDashboard = () => {
   const [tickets, setTickets] = useState([]);
   const [filterStatus, setFilterStatus] = useState('open');
+  const [filterPriority, setFilterPriority] = useState('all');
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [staffMembers, setStaffMembers] = useState([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { toast } = useToast();
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
     to: new Date()
   });
 
-  const handleUpdate = async (field, value) => {
+
+  const handleSync = async () => {
+    setIsSyncing(true);
     try {
-      const ticketRef = ref(database, `tickets/${selectedTicket.id}`);
-      await update(ticketRef, {
-        [field]: value,
-        lastUpdated: new Date().toISOString()
+      // Add loading state visual feedback
+      toast({
+        title: "Syncing...",
+        description: "Please wait while we sync your tickets",
       });
-      setIsEditing(prev => ({ ...prev, [field]: false }));
+
+      // Your sync logic here
+      await Promise.all([
+        fetch(`${scriptUrl}?function=onNewEmail`),
+        fetch(`${scriptUrl}?function=checkStatusChanges`),
+        fetch(`${scriptUrl}?function=cleanupDuplicateTickets`)
+      ]);
+
+      // Refresh the data
+      const ticketsRef = ref(database, 'tickets');
+      onValue(ticketsRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const ticketsData = Object.entries(snapshot.val())
+            .map(([id, value]) => ({
+              id,
+              ...value
+            }))
+            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          setTickets(ticketsData);
+        }
+      });
+
+      toast({
+        title: "Sync Complete",
+        description: "Your tickets have been updated",
+        variant: "success",
+      });
     } catch (error) {
-      console.error('Error updating ticket:', error);
+      toast({
+        title: "Sync Failed",
+        description: "There was an error syncing your tickets",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -343,22 +231,28 @@ const MaintenanceDashboard = () => {
   }, []);
 
   const filteredTickets = tickets.filter(ticket => {
-    const matchesStatus = filterStatus === 'open'
-      ? ticket.status !== 'completed'
-      : ticket.status === 'completed';
+    // Status filter
+    const matchesStatus = filterStatus === 'all'
+      ? true
+      : filterStatus === 'open'
+        ? ticket.status !== 'completed'
+        : ticket.status === 'completed';
 
+    // Priority filter
+    const matchesPriority = filterPriority === 'all'
+      ? true
+      : ticket.priority === filterPriority;
+
+    // Submitter search
     const matchesSearch = searchQuery
-      ? Object.values(ticket).some(value =>
-        String(value).toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      ? (typeof ticket.requester === 'object'
+        ? `${ticket.requester.name || ''} ${ticket.requester.surname || ''}`
+        : ticket.requester || ''
+      ).toLowerCase().includes(searchQuery.toLowerCase())
       : true;
 
-    const ticketDate = new Date(ticket.createdAt);
-    const matchesDate = ticketDate >= dateRange.from && ticketDate <= dateRange.to;
-
-    return matchesStatus && matchesSearch && matchesDate;
+    return matchesStatus && matchesPriority && matchesSearch;
   });
-
   const handleTicketClick = (ticket) => {
     setSelectedTicket(ticket);
     setCommentModalOpen(true);
@@ -366,22 +260,8 @@ const MaintenanceDashboard = () => {
 
   const handleClearFilters = () => {
     setSearchQuery('');
-    setDateRange({
-      from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
-      to: new Date()
-    });
     setFilterStatus('open');
-  };
-  const handleQuickUpdate = async (ticketId, field, value) => {
-    try {
-      const ticketRef = ref(database, `tickets/${ticketId}`);
-      await update(ticketRef, {
-        [field]: value,
-        lastUpdated: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error updating ticket:', error);
-    }
+    setFilterPriority('all');
   };
 
   return (
@@ -404,40 +284,72 @@ const MaintenanceDashboard = () => {
               Closed
             </Button>
           </div>
+          <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex items-center gap-4">
+              <Select
+                value={filterStatus}
+                onValueChange={setFilterStatus}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
+                </SelectContent>
+              </Select>
 
-          <div className="flex items-center gap-4">
-            <DateRangePicker
-              dateRange={dateRange}
-              onUpdate={setDateRange}
-            />
+              <Select
+                value={filterPriority}
+                onValueChange={setFilterPriority}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priority</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-xs"
-            />
+              <Input
+                placeholder="Search by submitter..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-xs"
+              />
 
-            <div className="flex gap-2">
-              <AdminPanel />
               <Button
                 variant="outline"
                 className="flex items-center gap-2"
                 onClick={handleClearFilters}
               >
                 <Filter className="h-4 w-4" />
-                Clear Filters
+                Clear
               </Button>
             </div>
-
           </div>
         </div>
-
         {/* Tickets Count */}
         <div className="flex items-center gap-2 mb-4">
           <h2 className="text-lg font-semibold">Tickets</h2>
           <Badge variant="secondary">{filteredTickets.length}</Badge>
         </div>
+        <div className="flex-1" />
+
+        {/* Add this Sync button */}
+        <Button
+          variant="outline"
+          onClick={handleSync}
+          disabled={isSyncing}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+          {isSyncing ? 'Syncing...' : 'Sync Email Tickets'}
+        </Button>
 
         <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
           <table className="w-full">
