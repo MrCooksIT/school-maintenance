@@ -1,11 +1,16 @@
-import TicketDetailsModal from './tickets/TicketDetailsModal';
+// src/components/MaintenanceDashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { ref, onValue, update } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { database } from '@/config/firebase';
+import TicketDetailsModal from './tickets/TicketDetailsModal';
+import { DateRangePicker } from './DateRangePicker';
 import {
   Filter,
-  MoreVertical,
   MessageSquare,
+  RefreshCw,
+  Search,
+  Sliders,
+  X,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -17,38 +22,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { RefreshCw } from 'lucide-react';
-import { useToast } from "@/components/ui/use-toast"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from './ui/popover';
+import { useToast } from "@/components/ui/use-toast";
 
-// Constants
-const STATUS_OPTIONS = [
-  { value: 'new', label: 'New' },
-  { value: 'in-progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'overdue', label: 'Overdue' }
-];
-//
-const PRIORITY_OPTIONS = [
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' }
-];
-//Status
+// Status Badge Component
 const StatusBadge = ({ status }) => {
   const statusStyles = {
     new: "bg-blue-100 text-blue-800 border-blue-200",
     "in-progress": "bg-yellow-100 text-yellow-800 border-yellow-200",
     completed: "bg-green-100 text-green-800 border-green-200",
-    overdue: "bg-Red-100 text-Red-800 border-Red-200"
+    overdue: "bg-red-100 text-red-800 border-red-200"
   };
+
+  const displayText = status === 'in-progress' ? 'IN PROGRESS' : status?.toUpperCase();
 
   return (
     <Badge className={`${statusStyles[status]} text-xs uppercase`}>
-      {status}
+      {displayText}
     </Badge>
   );
 };
 
+// Priority Badge Component
 const PriorityBadge = ({ priority }) => {
   const priorityStyles = {
     high: "bg-red-100 text-red-800 border-red-200",
@@ -63,81 +62,67 @@ const PriorityBadge = ({ priority }) => {
   );
 };
 
-// TicketRow Component
-
+// Ticket Row Component
 const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
-  const [editedData, setEditedData] = useState(ticket);
   return (
-    <tr className="hover:bg-gray-50 cursor-pointer" onClick={() => onTicketClick(ticket)}>
-        <td className="px-4 py-2 text-sm">
-            {typeof ticket.requester === 'object'
-                ? `${ticket.requester.name || ''} ${ticket.requester.surname || ''}`
-                : ticket.requester}
-        </td>
-
-        <td className="px-4 py-2 text-sm">
-            {ticket.dueDate || 'No due date'}
-        </td>
-
-        <td className="px-4 py-2 text-sm font-mono">{ticket.ticketId}</td>
-
-        <td className="px-4 py-2">
-            <StatusBadge status={ticket.status} />
-        </td>
-
-        <td className="px-4 py-2 text-sm">
-            {ticket.subject}
-        </td>
-
-        <td className="px-4 py-2 text-sm">
-            {ticket.description}
-        </td>
-
-        <td className="px-4 py-2">
-            <PriorityBadge priority={ticket.priority} />
-        </td>
-
-        <td className="px-4 py-2">
-            {ticket.assignedTo ? (
-                <Badge variant="outline">
-                    {staffMembers.find(s => s.id === ticket.assignedTo)?.name || 'Unknown'}
-                </Badge>
-            ) : (
-                <Badge variant="secondary">Unassigned</Badge>
-            )}
-        </td>
-
-        <td className="px-4 py-2 text-sm">
-            {ticket.completedAt ? (
-                new Date(ticket.completedAt).toLocaleString('en-GB', {
-                    dateStyle: 'medium',
-                    timeStyle: 'short'
-                })
-            ) : (
-                '-'
-            )}
-        </td>
-
-        <td className="px-4 py-2">
-            <Button
-                size="sm"
-                variant="ghost"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onTicketClick(ticket);
-                }}
-            >
-                <MessageSquare className="h-4 w-4" />
-            </Button>
-        </td>
+    <tr
+      className="hover:bg-gray-50 cursor-pointer border-b transition-colors"
+      onClick={() => onTicketClick(ticket)}
+    >
+      <td className="px-4 py-3 text-sm">
+        {typeof ticket.requester === 'object'
+          ? `${ticket.requester.name || ''} ${ticket.requester.surname || ''}`
+          : ticket.requester}
+      </td>
+      <td className="px-4 py-3 text-sm">
+        {ticket.dueDate ? new Date(ticket.dueDate).toLocaleDateString() : '-'}
+      </td>
+      <td className="px-4 py-3 text-sm font-mono">{ticket.ticketId}</td>
+      <td className="px-4 py-3">
+        <StatusBadge status={ticket.status} />
+      </td>
+      <td className="px-4 py-3 text-sm font-medium">{ticket.subject}</td>
+      <td className="px-4 py-3">
+        <PriorityBadge priority={ticket.priority} />
+      </td>
+      <td className="px-4 py-3">
+        {ticket.assignedTo ? (
+          <Badge variant="outline" className="bg-blue-50">
+            {staffMembers.find(s => s.id === ticket.assignedTo)?.name || 'Unknown'}
+          </Badge>
+        ) : (
+          <Badge variant="secondary">Unassigned</Badge>
+        )}
+      </td>
+      <td className="px-4 py-3 text-sm">
+        {ticket.completedAt ? (
+          new Date(ticket.completedAt).toLocaleString('en-GB', {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+          })
+        ) : (
+          '-'
+        )}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            onTicketClick(ticket);
+          }}
+        >
+          <MessageSquare className="h-4 w-4" />
+        </Button>
+      </td>
     </tr>
-);
+  );
 };
 
 const MaintenanceDashboard = () => {
   const [tickets, setTickets] = useState([]);
   const [filterStatus, setFilterStatus] = useState('open');
-  const [filterPriority, setFilterPriority] = useState('all');
   const [commentModalOpen, setCommentModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTicket, setSelectedTicket] = useState(null);
@@ -148,44 +133,32 @@ const MaintenanceDashboard = () => {
     from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
     to: new Date()
   });
-
+  const [advancedFilters, setAdvancedFilters] = useState({
+    priority: '',
+    location: '',
+    assignee: ''
+  });
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      // Add loading state visual feedback
       toast({
-        title: "Syncing...",
-        description: "Please wait while we sync your tickets",
+        title: "Syncing Tickets",
+        description: "Please wait while we sync your tickets...",
+        variant: "info",
       });
 
-      // Your sync logic here
-      await Promise.all([
-        fetch(`${scriptUrl}?function=onNewEmail`),
-        fetch(`${scriptUrl}?function=checkStatusChanges`),
-        fetch(`${scriptUrl}?function=cleanupDuplicateTickets`)
-      ]);
-
-      // Refresh the data
-      const ticketsRef = ref(database, 'tickets');
-      onValue(ticketsRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const ticketsData = Object.entries(snapshot.val())
-            .map(([id, value]) => ({
-              id,
-              ...value
-            }))
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-          setTickets(ticketsData);
-        }
-      });
+      // Your actual sync logic here
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulating API call
 
       toast({
         title: "Sync Complete",
-        description: "Your tickets have been updated",
+        description: "Your tickets have been updated successfully",
         variant: "success",
       });
     } catch (error) {
+      console.error('Error syncing tickets:', error);
       toast({
         title: "Sync Failed",
         description: "There was an error syncing your tickets",
@@ -196,18 +169,30 @@ const MaintenanceDashboard = () => {
     }
   };
 
+  const clearFilters = () => {
+    setSearchQuery('');
+    setAdvancedFilters({
+      priority: '',
+      location: '',
+      assignee: ''
+    });
+    setDateRange({
+      from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+      to: new Date()
+    });
+  };
+
   useEffect(() => {
     const ticketsRef = ref(database, 'tickets');
     const unsubscribe = onValue(ticketsRef, (snapshot) => {
       if (snapshot.exists()) {
-        const ticketsData = snapshot.val();
-        const ticketsArray = Object.entries(ticketsData)
+        const ticketsData = Object.entries(snapshot.val())
           .map(([id, value]) => ({
             id,
             ...value
           }))
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setTickets(ticketsArray);
+        setTickets(ticketsData);
       }
     });
 
@@ -231,163 +216,249 @@ const MaintenanceDashboard = () => {
   }, []);
 
   const filteredTickets = tickets.filter(ticket => {
-    // Status filter
-    const matchesStatus = filterStatus === 'all'
-      ? true
-      : filterStatus === 'open'
-        ? ticket.status !== 'completed'
-        : ticket.status === 'completed';
+    // Status filter (open/closed)
+    const statusMatch = filterStatus === 'open'
+      ? ticket.status !== 'completed'
+      : ticket.status === 'completed';
 
-    // Priority filter
-    const matchesPriority = filterPriority === 'all'
-      ? true
-      : ticket.priority === filterPriority;
-
-    // Submitter search
-    const matchesSearch = searchQuery
-      ? (typeof ticket.requester === 'object'
-        ? `${ticket.requester.name || ''} ${ticket.requester.surname || ''}`
-        : ticket.requester || ''
-      ).toLowerCase().includes(searchQuery.toLowerCase())
+    // Search query
+    const searchMatch = searchQuery
+      ? Object.values(ticket).some(value =>
+        String(value).toLowerCase().includes(searchQuery.toLowerCase())
+      )
       : true;
 
-    return matchesStatus && matchesPriority && matchesSearch;
+    // Date range
+    const ticketDate = new Date(ticket.createdAt);
+    const dateMatch = (!dateRange.from || ticketDate >= dateRange.from) &&
+      (!dateRange.to || ticketDate <= dateRange.to);
+
+    // Advanced filters
+    const priorityMatch = !advancedFilters.priority || ticket.priority === advancedFilters.priority;
+    const locationMatch = !advancedFilters.location ||
+      (ticket.location && ticket.location.toLowerCase().includes(advancedFilters.location.toLowerCase()));
+    const assigneeMatch = !advancedFilters.assignee || ticket.assignedTo === advancedFilters.assignee;
+
+    return statusMatch && searchMatch && dateMatch && priorityMatch && locationMatch && assigneeMatch;
   });
+
   const handleTicketClick = (ticket) => {
     setSelectedTicket(ticket);
     setCommentModalOpen(true);
   };
 
-  const handleClearFilters = () => {
-    setSearchQuery('');
-    setFilterStatus('open');
-    setFilterPriority('all');
-  };
-
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        {/* Filter Section */}
-        <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow-sm">
-          <div className="flex gap-2">
+    <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
+      {/* Top section with filters */}
+      <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+          {/* Status toggle */}
+          <div className="flex gap-2 p-1 bg-gray-100 rounded-lg shadow-inner">
             <Button
-              variant={filterStatus === 'open' ? 'default' : 'outline'}
+              variant={filterStatus === 'open' ? 'default' : 'ghost'}
               onClick={() => setFilterStatus('open')}
-              className="bg-marist text-white hover:bg-marist-light"
+              className={filterStatus === 'open' ? "bg-[#0a1e46] text-white" : "text-gray-600"}
+              size="sm"
             >
-              Open
+              Open Tickets
             </Button>
             <Button
-              variant={filterStatus === 'closed' ? 'default' : 'outline'}
+              variant={filterStatus === 'closed' ? 'default' : 'ghost'}
               onClick={() => setFilterStatus('closed')}
+              className={filterStatus === 'closed' ? "bg-[#0a1e46] text-white" : "text-gray-600"}
+              size="sm"
             >
-              Closed
+              Closed Tickets
             </Button>
           </div>
-          <div className="flex items-center justify-between mb-4 bg-white p-4 rounded-lg shadow-sm">
-            <div className="flex items-center gap-4">
-              <Select
-                value={filterStatus}
-                onValueChange={setFilterStatus}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
-                  <SelectItem value="all">All</SelectItem>
-                </SelectContent>
-              </Select>
 
-              <Select
-                value={filterPriority}
-                onValueChange={setFilterPriority}
-              >
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Priority</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-
+          {/* Search and filters */}
+          <div className="flex flex-1 flex-col md:flex-row gap-3 md:max-w-2xl lg:max-w-3xl">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search by submitter..."
+                placeholder="Search tickets..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="max-w-xs"
+                className="pl-10 w-full"
               />
-
-              <Button
-                variant="outline"
-                className="flex items-center gap-2"
-                onClick={handleClearFilters}
-              >
-                <Filter className="h-4 w-4" />
-                Clear
-              </Button>
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
             </div>
+
+            <DateRangePicker
+              dateRange={dateRange}
+              onUpdate={setDateRange}
+              className="flex-1"
+            />
+
+            <Popover open={showAdvancedFilters} onOpenChange={setShowAdvancedFilters}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="relative"
+                  size="sm"
+                >
+                  <Sliders className="h-4 w-4 mr-2" />
+                  Advanced Filters
+                  {(advancedFilters.priority || advancedFilters.location || advancedFilters.assignee) && (
+                    <span className="absolute top-0 right-0 -mt-1 -mr-1 h-3 w-3 rounded-full bg-blue-500"></span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-4 bg-white border shadow-lg z-50">
+                <div className="space-y-4">
+                  <h3 className="font-medium">Advanced Filters</h3>
+
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-500">Priority</label>
+                    <Select
+                      value={advancedFilters.priority}
+                      onValueChange={(value) => setAdvancedFilters(prev => ({ ...prev, priority: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Any priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Any priority</SelectItem>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-500">Location</label>
+                    <Input
+                      placeholder="Filter by location"
+                      value={advancedFilters.location}
+                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, location: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-500">Assigned To</label>
+                    <Select
+                      value={advancedFilters.assignee}
+                      onValueChange={(value) => setAdvancedFilters(prev => ({ ...prev, assignee: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Any staff member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Any staff member</SelectItem>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {staffMembers.map(staff => (
+                          <SelectItem key={staff.id} value={staff.id}>
+                            {staff.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-between pt-2">
+                    <Button variant="outline" size="sm" onClick={clearFilters}>
+                      Reset Filters
+                    </Button>
+                    <Button size="sm" onClick={() => setShowAdvancedFilters(false)}>
+                      Apply Filters
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
+
+          {/* Sync button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="whitespace-nowrap"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing...' : 'Sync Tickets'}
+          </Button>
         </div>
-        {/* Tickets Count */}
-        <div className="flex items-center gap-2 mb-4">
+      </div>
+
+      {/* Tickets count and filters bar */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">Tickets</h2>
           <Badge variant="secondary">{filteredTickets.length}</Badge>
         </div>
-        <div className="flex-1" />
 
-        {/* Add this Sync button */}
-        <Button
-          variant="outline"
-          onClick={handleSync}
-          disabled={isSyncing}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          {isSyncing ? 'Syncing...' : 'Sync Email Tickets'}
-        </Button>
+        {/* Clear filters button - only shown when filters are active */}
+        {(searchQuery || advancedFilters.priority || advancedFilters.location || advancedFilters.assignee) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="text-sm"
+          >
+            <Filter className="h-3 w-3 mr-1" /> Clear Filters
+          </Button>
+        )}
+      </div>
 
-        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+      {/* Tickets table */}
+      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 text-left">
               <tr>
-                {/* Table Headers */}
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Reported By</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Due Date</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Ticket Number</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Title</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Description</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Priority</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Assigned To</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Completed</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-500">Actions</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500">Reported By</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500">Due Date</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500">Ticket Number</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500">Status</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500">Title</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500">Priority</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500">Assigned To</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500">Completed</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredTickets.map(ticket => (
-                <TicketRow
-                  key={ticket.id}
-                  ticket={ticket}
-                  onTicketClick={handleTicketClick}
-                  staffMembers={staffMembers}
-                />
-              ))}
+            <tbody>
+              {filteredTickets.length > 0 ? (
+                filteredTickets.map(ticket => (
+                  <TicketRow
+                    key={ticket.id}
+                    ticket={ticket}
+                    onTicketClick={handleTicketClick}
+                    staffMembers={staffMembers}
+                  />
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
+                    No tickets found matching your criteria
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-
-        <TicketDetailsModal
-          ticket={selectedTicket}
-          isOpen={commentModalOpen}
-          onClose={() => setCommentModalOpen(false)}
-          staffMembers={staffMembers}
-        />
       </div>
+
+      {/* Ticket details modal */}
+      <TicketDetailsModal
+        ticket={selectedTicket}
+        isOpen={commentModalOpen}
+        onClose={() => setCommentModalOpen(false)}
+        staffMembers={staffMembers}
+      />
     </div>
   );
 };

@@ -1,0 +1,12 @@
+{
+    "cors.json": [
+      {
+        "origin": [
+          "http://localhost:5173", 
+          "https://mrcooksit.github.io"
+        ],
+        "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+        "maxAgeSeconds": 3600
+      }
+    ]
+  }

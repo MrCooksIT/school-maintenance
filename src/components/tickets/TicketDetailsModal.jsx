@@ -1,17 +1,17 @@
 // src/components/tickets/TicketDetailsModal.jsx
 import React, { useState, useEffect } from 'react';
-import { ref, onValue, update } from 'firebase/database';
+import { ref, update, onValue } from 'firebase/database';
 import { database } from '@/config/firebase';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/components/ui/use-toast";
 import {
   Select,
   SelectContent,
@@ -20,16 +20,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { MessageSquare, X } from 'lucide-react';
-import { Textarea } from "@/components/ui/textarea";
+import { Edit2, Save, X, MessageSquare, FileText, Calendar, Clock, MapPin } from 'lucide-react';
 import { TicketComments } from './TicketComments';
 import { FileUpload } from './FileUpload';
-
+import { useToast } from "@/components/ui/use-toast";
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
   { value: 'in-progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' }
+  { value: 'completed', label: 'Completed' },
+  { value: 'overdue', label: 'Overdue' }
 ];
 
 const PRIORITY_OPTIONS = [
@@ -38,125 +38,91 @@ const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low' }
 ];
 
-const handleSaveAll = async () => {
-  try {
-    const ticketRef = ref(database, `tickets/${ticket.id}`);
-    await update(ticketRef, {
-      ...editedData,
-      lastUpdated: new Date().toISOString()
-    });
-
-    // Show success toast if you have it set up
-    toast({
-      title: "Changes saved",
-      description: "Ticket has been updated successfully",
-    });
-
-    onClose(); // Close the modal after saving
-  } catch (error) {
-    console.error('Error saving ticket:', error);
-    // Show error toast if you have it set up
-    toast({
-      title: "Error",
-      description: "Failed to save changes",
-      variant: "destructive",
-    });
-  }
-};
 const getPriorityStyle = (priority) => {
   const styles = {
-    high: "bg-red-900/50 text-red-200 border-red-800",
-    medium: "bg-yellow-900/50 text-yellow-200 border-yellow-800",
-    low: "bg-green-900/50 text-green-200 border-green-800"
+    high: "bg-red-100 text-red-800 border-red-200",
+    medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    low: "bg-green-100 text-green-800 border-green-200"
   };
   return styles[priority] || styles.medium;
 };
 
-const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
-  const { toast } = useToast();
-  const handleSaveAll = async () => {
-    if (!editedData.id) return;
-    try {
-      const ticketRef = ref(database, `tickets/${editedData.id}`); // Use editedData instead of ticket
-      await update(ticketRef, {
-        ...editedData,
-        lastUpdated: new Date().toISOString()
-      });
-
-      toast({
-        title: "Changes saved",
-        description: "Ticket has been updated successfully",
-      });
-
-      onClose();
-    } catch (error) {
-      console.error('Error saving ticket:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save changes",
-        variant: "destructive",
-      });
-    }
+const getStatusStyle = (status) => {
+  const styles = {
+    new: "bg-blue-100 text-blue-800 border-blue-200",
+    "in-progress": "bg-yellow-100 text-yellow-800 border-yellow-200",
+    completed: "bg-green-100 text-green-800 border-green-200",
+    overdue: "bg-red-100 text-red-800 border-red-200"
   };
-  const [editedData, setEditedData] = useState({
-    priority: 'low',
-    status: 'new',
-    subject: '',
-    description: '',
-    location: '',
-    category: '',
-    assignedTo: null,
-  });
+  return styles[status] || styles.new;
+};
+
+const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
+  // All hooks must be called at the top level and unconditionally
+  const [editedData, setEditedData] = useState({});
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
+  const { toast } = useToast();
 
   // Update editedData when ticket changes
   useEffect(() => {
     if (ticket) {
-      setEditedData({
-        priority: 'low',
-        status: 'new',
-        subject: '',
-        description: '',
-        location: '',
-        category: '',
-        assignedTo: null,
-        ...ticket
-      });
+      setEditedData(ticket);
     }
   }, [ticket]);
 
+  // Load categories - always called unconditionally
   useEffect(() => {
     const categoriesRef = ref(database, 'categories');
-    const locationsRef = ref(database, 'locations');
-
-    const unsubscribeCategories = onValue(categoriesRef, (snapshot) => {
+    const unsubscribe = onValue(categoriesRef, (snapshot) => {
       if (snapshot.exists()) {
         const categoriesData = Object.entries(snapshot.val()).map(([id, data]) => ({
           id,
-          ...data
+          ...data,
         }));
         setCategories(categoriesData);
+      } else {
+        setCategories([]);
       }
     });
 
-    const unsubscribeLocations = onValue(locationsRef, (snapshot) => {
+    return () => unsubscribe();
+  }, []);
+
+  // Load locations - always called unconditionally
+  useEffect(() => {
+    const locationsRef = ref(database, 'locations');
+    const unsubscribe = onValue(locationsRef, (snapshot) => {
       if (snapshot.exists()) {
         const locationsData = Object.entries(snapshot.val()).map(([id, data]) => ({
           id,
-          ...data
+          ...data,
         }));
         setLocations(locationsData);
+      } else {
+        setLocations([]);
       }
     });
 
-    return () => {
-      unsubscribeCategories();
-      unsubscribeLocations();
-    };
+    return () => unsubscribe();
   }, []);
 
+  // Utility functions (not hooks)
+  const getCategoryName = (categoryId) => {
+    if (!categoryId || categoryId === 'none') return '';
+    const category = categories.find(cat => cat.id === categoryId);
+    return category ? category.name : categoryId;
+  };
+
+  const getLocationName = (locationId) => {
+    if (!locationId || locationId === 'none') return '';
+    const location = locations.find(loc => loc.id === locationId);
+    return location ? location.name : locationId;
+  };
+
   const handleQuickUpdate = async (field, value) => {
+    if (!ticket) return;
+
     try {
       const ticketRef = ref(database, `tickets/${ticket.id}`);
       await update(ticketRef, {
@@ -164,34 +130,62 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
         lastUpdated: new Date().toISOString()
       });
       setEditedData(prev => ({ ...prev, [field]: value }));
+
+      toast({
+        title: "Update Successful",
+        description: `The ticket ${field} has been updated.`,
+        variant: "success"
+      });
     } catch (error) {
       console.error('Error updating ticket:', error);
+      toast({
+        title: "Update Failed",
+        description: `There was an error updating the ticket.`,
+        variant: "destructive"
+      });
     }
   };
 
-  // Guard clause
-  if (!ticket) return null;
+  // Early render check - but must be AFTER all hooks!
+  if (!ticket) {
+    return null;
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-full max-w-[90vw] md:max-w-4xl lg:max-w-5xl p-4 md:p-6 bg-white">
-        <DialogHeader className="border-b bg-[#1E3A6B] text-white">
-          <div className="flex items-center justify-between p-6 border-b bg-[#1E3A6B] text-white">
-            <div className="flex items-right space-x-20">
-              <span className="text-3xl font-semibold">{editedData?.ticketId}</span>
-              <div className="flex items-center gap-4">
+      <DialogContent
+        className="w-full max-w-[90vw] md:max-w-4xl lg:max-w-5xl p-0 max-h-[90vh] overflow-hidden flex flex-col"
+        aria-describedby="ticket-details-description"
+      >
+        {/* Hidden but accessible title and description for screen readers */}
+        <DialogHeader className="sr-only">
+          <DialogTitle>Ticket Details: {ticket.ticketId}</DialogTitle>
+          <DialogDescription id="ticket-details-description">
+            View and manage details, comments, and files for ticket {ticket.ticketId}
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Header with ticket info and status badges */}
+        <div className="p-6 border-b bg-[#0a1e46] text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-2xl font-bold">{ticket.ticketId}</span>
+              <div className="flex items-center gap-2">
                 <Select
-                  value={editedData?.priority || 'low'}
+                  value={editedData.priority}
                   onValueChange={(value) => handleQuickUpdate('priority', value)}
                 >
-                  <SelectTrigger className="border-0 bg-[#1E3A6B] transition-colors min-h-5 h-auto p-0 w-auto">
-                    <Badge className={getPriorityStyle(editedData?.priority || 'low')}>
-                      {(editedData?.priority || 'low').toUpperCase()}
-                    </Badge>
+                  <SelectTrigger className="border-0 bg-transparent p-0 h-8 w-auto">
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityStyle(editedData.priority)}`}>
+                      {editedData.priority?.toUpperCase()}
+                    </div>
                   </SelectTrigger>
                   <SelectContent>
                     {PRIORITY_OPTIONS.map((priority) => (
                       <SelectItem key={priority.value} value={priority.value}>
-                        {priority.label}
+                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityStyle(priority.value)}`}>
+                          {priority.label.toUpperCase()}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -201,19 +195,17 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                   value={editedData.status}
                   onValueChange={(value) => handleQuickUpdate('status', value)}
                 >
-                  <SelectTrigger className="border-0 bg-[#1E3A6B] transition-colors min-h-0 h-auto p-0">
-                    <Badge variant="outline" className="border-white/20 text-white">
-                      {editedData.status}
-                    </Badge>
+                  <SelectTrigger className="border-0 bg-transparent p-0 h-8 w-auto">
+                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(editedData.status)}`}>
+                      {editedData.status === 'in-progress' ? 'IN PROGRESS' : editedData.status?.toUpperCase()}
+                    </div>
                   </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-md rounded-md">
+                  <SelectContent>
                     {STATUS_OPTIONS.map((status) => (
-                      <SelectItem
-                        key={status.value}
-                        value={status.value}
-                        className="hover:bg-gray-100 cursor-pointer"
-                      >
-                        {status.label}
+                      <SelectItem key={status.value} value={status.value}>
+                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyle(status.value)}`}>
+                          {status.label.toUpperCase()}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -223,210 +215,255 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:bg-[#12327A]"
               onClick={onClose}
+              className="text-white hover:bg-blue-900/50 rounded-full"
             >
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <div className="text-sm text-gray-300 mt-2">
-            Created on {new Date(ticket.createdAt).toLocaleString()}
+          <div className="text-sm text-gray-300 mt-2 flex items-center gap-4">
+            <div className="flex items-center gap-1">
+              <Calendar className="h-4 w-4" />
+              Created: {new Date(ticket.createdAt).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })}
+            </div>
+            {ticket.lastUpdated && (
+              <div className="flex items-center gap-1">
+                <Clock className="h-4 w-4" />
+                Updated: {new Date(ticket.lastUpdated).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </div>
+            )}
           </div>
-        </DialogHeader>
+        </div>
 
-        <Tabs defaultValue="details" className="bg-white">
-          <div className="border-b bg-white">
-            <TabsList className="w-full rounded-none border-0 bg-[#f8f9fa]">
+        {/* Tabs and content area */}
+        <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
+          <div className="border-b bg-gray-100">
+            <TabsList className="w-full rounded-none border-0 bg-transparent h-12">
               <TabsTrigger
                 value="details"
-                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A6B] text-gray-600 data-[state=active]:text-[#1E3A6B] data-[state=active]:bg-white"
+                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#0a1e46] data-[state=active]:text-[#0a1e46] text-gray-600 h-12"
               >
                 Details
               </TabsTrigger>
               <TabsTrigger
                 value="comments"
-                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A6B] text-gray-600 data-[state=active]:text-[#1E3A6B] data-[state=active]:bg-white"
+                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#0a1e46] data-[state=active]:text-[#0a1e46] text-gray-600 h-12"
               >
                 Comments
               </TabsTrigger>
               <TabsTrigger
                 value="files"
-                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#1E3A6B] text-gray-600 data-[state=active]:text-[#1E3A6B] data-[state=active]:bg-white"
+                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#0a1e46] data-[state=active]:text-[#0a1e46] text-gray-600 h-12"
               >
                 Files
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <div className="p-6 bg-white">
-            <TabsContent value="details" className="mt-0 space-y-6">
-              <div className="bg-white p-4 rounded-lg border">
-                <h3 className="text-lg font-semibold mb-4">Ticket Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">
-                        Subject
-                      </label>
-                      <Input
-                        value={editedData.subject}
-                        onChange={(e) => handleQuickUpdate('subject', e.target.value)}
-                        className="w-full bg-white"
-                      />
-                    </div>
+          <div className="flex-1 overflow-auto">
+            <TabsContent value="details" className="p-6 h-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left column */}
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Subject</label>
+                    <Input
+                      value={editedData.subject || ''}
+                      onChange={(e) => setEditedData(prev => ({ ...prev, subject: e.target.value }))}
+                      onBlur={() => editedData.subject !== ticket.subject && handleQuickUpdate('subject', editedData.subject)}
+                      className="border-gray-300"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">
-                        Description
-                      </label>
-                      <Textarea
-                        value={editedData.description}
-                        onChange={(e) => handleQuickUpdate('description', e.target.value)}
-                        className="w-full min-h-[100px]"
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Description</label>
+                    <Textarea
+                      value={editedData.description || ''}
+                      onChange={(e) => setEditedData(prev => ({ ...prev, description: e.target.value }))}
+                      onBlur={() => editedData.description !== ticket.description && handleQuickUpdate('description', editedData.description)}
+                      className="border-gray-300 min-h-[150px]"
+                    />
+                  </div>
 
-                    <div>
-                      <Select
-                        value={editedData.location || ""}
-                        onValueChange={(value) => handleQuickUpdate('location', value)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {locations.map((location) => (
-                            <SelectItem key={location.id} value={location.id}>
-                              {location.name} - {location.building}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Location</label>
+                    <Select
+                      value={editedData.location || 'none'}
+                      onValueChange={(value) => handleQuickUpdate('location', value === 'none' ? null : value)}
+                    >
+                      <SelectTrigger className="border-gray-300">
+                        <SelectValue placeholder="Select location">
+                          {getLocationName(editedData.location) || "Select location"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {locations.map((location) => (
+                          <SelectItem key={location.id} value={location.id}>
+                            {location.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
 
-                      <Select
-                        value={editedData.category || ""}
-                        onValueChange={(value) => handleQuickUpdate('category', value)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                {/* Right column */}
+                <div className="space-y-6">
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 className="text-base font-medium text-gray-800 mb-3">Ticket Information</h3>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Reported By:</span>
+                        <span className="text-sm font-medium">
+                          {typeof editedData.requester === 'object'
+                            ? `${editedData.requester.name || ''} ${editedData.requester.surname || ''}`
+                            : editedData.requester}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Due Date:</span>
+                        <Input
+                          type="date"
+                          value={editedData.dueDate || ''}
+                          onChange={(e) => setEditedData(prev => ({ ...prev, dueDate: e.target.value }))}
+                          onBlur={() => editedData.dueDate !== ticket.dueDate && handleQuickUpdate('dueDate', editedData.dueDate)}
+                          className="w-36 h-8 border-gray-300"
+                        />
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Category:</span>
+                        <Select
+                          value={editedData.category || 'none'}
+                          onValueChange={(value) => handleQuickUpdate('category', value === 'none' ? null : value)}
+                        >
+                          <SelectTrigger className="w-36 h-8 border-gray-300">
+                            <SelectValue placeholder="Select category">
+                              {getCategoryName(editedData.category) || "Select category"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {categories.map((category) => (
+                              <SelectItem key={category.id} value={category.id}>
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {editedData.completedAt && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Completed On:</span>
+                          <span className="text-sm font-medium">
+                            {new Date(editedData.completedAt).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Right Column */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">
-                        Reported By
-                      </label>
-                      <div className="text-sm bg-gray-50 p-2 rounded">
-                        {typeof editedData.requester === 'object'
-                          ? `${editedData.requester.name || ''} ${editedData.requester.surname || ''}`
-                          : editedData.requester}
-                      </div>
-                    </div>
+                  <div className="bg-[#0a1e46] p-4 rounded-lg">
+                    <h3 className="text-base font-medium text-white mb-3">Assignment</h3>
+                    <Select
+                      value={editedData.assignedTo || "unassigned"}
+                      onValueChange={(value) => handleQuickUpdate('assignedTo', value === 'unassigned' ? null : value)}
+                    >
+                      <SelectTrigger className="bg-white">
+                        <SelectValue placeholder="Assign to staff member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
+                        {staffMembers?.map((staff) => (
+                          <SelectItem key={staff.id} value={staff.id}>
+                            {staff.name} - {staff.department}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">
-                        Created
-                      </label>
-                      <div className="text-sm bg-gray-50 p-2 rounded">
-                        {new Date(editedData.createdAt).toLocaleString('en-GB', {
-                          dateStyle: 'medium',
-                          timeStyle: 'short'
-                        })}
-                      </div>
-                    </div>
+                  <div className="pt-4 flex gap-2">
+                    <Button
+                      onClick={() => {
+                        // Save all pending changes (if any)
+                        const hasChanges = Object.entries(editedData).some(([key, value]) => {
+                          return ticket[key] !== value && key !== 'lastUpdated';
+                        });
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-1">
-                        Due Date
-                      </label>
-                      <Input
-                        type="date"
-                        value={editedData.dueDate || ''}
-                        onChange={(e) => handleQuickUpdate('dueDate', e.target.value)}
-                        className="w-full bg-white"
-                      />
-                    </div>
+                        if (hasChanges) {
+                          const updates = { ...editedData, lastUpdated: new Date().toISOString() };
+                          const ticketRef = ref(database, `tickets/${ticket.id}`);
+                          update(ticketRef, updates).then(() => {
+                            toast({
+                              title: "Changes Saved",
+                              description: "All changes have been saved successfully",
+                              variant: "success"
+                            });
+                          }).catch(error => {
+                            toast({
+                              title: "Error",
+                              description: "Failed to save changes",
+                              variant: "destructive"
+                            });
+                            console.error('Error saving changes:', error);
+                          });
+                        } else {
+                          toast({
+                            title: "No Changes",
+                            description: "No changes to save",
+                            variant: "info"
+                          });
+                        }
+                      }}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      Save Changes
+                    </Button>
 
-                    {editedData.lastUpdated && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-600 mb-1">
-                          Last Updated
-                        </label>
-                        <div className="text-sm bg-gray-50 p-2 rounded">
-                          {new Date(editedData.lastUpdated).toLocaleString('en-GB', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short'
-                          })}
-                        </div>
-                      </div>
+                    {editedData.status !== 'completed' && (
+                      <Button
+                        onClick={() => {
+                          handleQuickUpdate('status', 'completed');
+                          handleQuickUpdate('completedAt', new Date().toISOString());
+                        }}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        Mark as Completed
+                      </Button>
                     )}
                   </div>
                 </div>
               </div>
-
-              <div className="bg-[#1E3A6B] p-4 rounded-lg">
-                <h3 className="text-lg font-semibold mb-4 text-white">Assignment</h3>
-                <Select
-                  value={editedData.assignedTo || "unassigned"}
-                  onValueChange={(value) => handleQuickUpdate('assignedTo', value === 'unassigned' ? null : value)}
-                >
-                  <SelectTrigger className="w-full bg-white">
-                    <SelectValue placeholder="Assign to staff member" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white border shadow-lg">
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {staffMembers?.map((staff) => (
-                      <SelectItem
-                        key={staff.id}
-                        value={staff.id}
-                        className="hover:bg-gray-100"
-                      >
-                        {staff.name} - {staff.department}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
             </TabsContent>
 
-            <TabsContent value="comments" className="mt-0">
+            <TabsContent value="comments" className="p-0 h-[500px] flex flex-col">
               <TicketComments ticketId={ticket.id} />
             </TabsContent>
 
-            <TabsContent value="files" className="mt-0">
+            <TabsContent value="files" className="p-0 h-[500px] flex flex-col">
               <FileUpload ticketId={ticket.id} />
             </TabsContent>
           </div>
         </Tabs>
-        <div className="flex justify-end gap-4 mt-4 border-t pt-4">
-          <Button
-            variant="outline"
-            onClick={onClose}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveAll}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            Save Changes
-          </Button>
-        </div>
       </DialogContent>
     </Dialog>
-
   );
 };
 
