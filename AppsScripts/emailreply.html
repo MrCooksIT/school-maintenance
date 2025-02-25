@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px;">
+      <h2 style="color: #1a73e8;">Maintenance Request Received</h2>
+      <p>Your maintenance request has been logged successfully.</p>
+      
+      <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p><strong>Ticket Reference:</strong> <?= ticketId ?></p>
+        <p><strong>Subject:</strong> <?= subject ?></p>
+        <p><strong>Submitted:</strong> <?= submissionTime ?></p>
+      </div>
+
+      <p>What happens next?</p>
+      <ol>
+        <li>Our maintenance team will review your request</li>
+        <li>You will receive updates as the status changes</li>
+        <li>You can reply to any update emails if you need to add information</li>
+      </ol>
+
+      <p style="color: #666;">Thank you for your patience.</p>
+      <hr style="border: 1px solid #eee; margin: 20px 0;">
+      <p style="color: #666; font-size: 12px;">This is an automated message from the SJMC School Maintenance System.</p>
+    </div>
+  </body>
+</html>
