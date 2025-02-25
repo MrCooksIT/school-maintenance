@@ -1,3 +1,4 @@
+// src/components/layout/RootLayout.jsx
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -89,7 +90,7 @@ const Header = ({ toggleSidebar }) => (
 
         {/* Centered logo and title */}
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4">
-            <img src="public/school-logo2.png" alt="SJMC Logo" className="h-12" />
+            <img src="/school-maintenance/school-logo2.png" alt="SJMC Logo" className="h-12" />
             <div className="flex flex-col text-center">
                 <h1 className="text-xl font-semibold">SJMC Maintenance Portal</h1>
             </div>
