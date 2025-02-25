@@ -224,7 +224,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
           <div className="text-sm text-gray-300 mt-2 flex items-center gap-4">
             <div className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
-              Created: {new Date(ticket.createdAt).toLocaleDateString('en-US', {
+              Created: {new Date(ticket.createdAt).toLocaleDateString('en-ZA', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric'
@@ -233,7 +233,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
             {ticket.lastUpdated && (
               <div className="flex items-center gap-1">
                 <Clock className="h-4 w-4" />
-                Updated: {new Date(ticket.lastUpdated).toLocaleDateString('en-US', {
+                Updated: {new Date(ticket.lastUpdated).toLocaleDateString('en-ZA', {
                   year: 'numeric',
                   month: 'short',
                   day: 'numeric'
@@ -368,7 +368,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Completed On:</span>
                           <span className="text-sm font-medium">
-                            {new Date(editedData.completedAt).toLocaleDateString('en-US', {
+                            {new Date(editedData.completedAt).toLocaleDateString('en-ZA', {
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric'

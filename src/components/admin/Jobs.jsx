@@ -147,7 +147,7 @@ const Jobs = () => {
                                                 {ticket.dueDate && (
                                                     <div className="flex items-center gap-2 text-sm">
                                                         <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                                                        Due {new Date(ticket.dueDate).toLocaleDateString()}
+                                                        Due {new Date(ticket.dueDate).toLocaleDateString('en-ZA')}
                                                     </div>
                                                 )}
                                             </div>

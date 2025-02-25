@@ -75,7 +75,7 @@ const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
           : ticket.requester}
       </td>
       <td className="px-4 py-3 text-sm">
-        {ticket.dueDate ? new Date(ticket.dueDate).toLocaleDateString() : '-'}
+        {ticket.dueDate ? new Date(ticket.dueDate).toLocaleDateString('en-ZA') : '-'}
       </td>
       <td className="px-4 py-3 text-sm font-mono">{ticket.ticketId}</td>
       <td className="px-4 py-3">
@@ -96,7 +96,7 @@ const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
       </td>
       <td className="px-4 py-3 text-sm">
         {ticket.completedAt ? (
-          new Date(ticket.completedAt).toLocaleString('en-GB', {
+          new Date(ticket.createdAt).toLocaleString('en-ZA', {
             dateStyle: 'medium',
             timeStyle: 'short'
           })

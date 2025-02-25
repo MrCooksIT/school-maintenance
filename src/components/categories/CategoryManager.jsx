@@ -53,7 +53,7 @@ export function CategoryManager() {
                         <CardContent>
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-muted-foreground">
-                                    Created {new Date(category.createdAt).toLocaleDateString()}
+                                    Created {new Date(category.createdAt).toLocaleDateString('en-ZA')}
                                 </span>
                                 <Button variant="ghost" size="sm">
                                     <Trash2 className="h-4 w-4" />

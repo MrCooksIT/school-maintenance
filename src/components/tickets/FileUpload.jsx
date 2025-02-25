@@ -273,7 +273,7 @@ export function FileUpload({ ticketId }) {
                                         <div className="flex gap-2 text-xs text-gray-500">
                                             <span>{formatFileSize(file.size)}</span>
                                             <span>•</span>
-                                            <span>{format(new Date(file.uploadedAt), 'MMM d, yyyy')}</span>
+                                            <span>{format(new Date(file.uploadedAt), 'd MMM yyyy')}</span>
                                         </div>
                                     </div>
                                 </div>

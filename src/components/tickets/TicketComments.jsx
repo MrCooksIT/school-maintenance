@@ -92,7 +92,7 @@ export function TicketComments({ ticketId }) {
                                             <div className="flex justify-between items-start mb-2">
                                                 <span className="font-medium text-sm">{comment.user}</span>
                                                 <span className="text-xs text-gray-500">
-                                                    {format(new Date(comment.timestamp), 'MMM d, yyyy, h:mm a')}
+                                                    {format(new Date(comment.timestamp), 'd MMM yyyy, HH:mm')}
                                                 </span>
                                             </div>
                                             <p className="text-sm text-gray-700">{comment.content}</p>
