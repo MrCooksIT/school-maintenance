@@ -103,8 +103,7 @@ const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
         )}
       </td>
       <td className="px-4 py-3 text-sm">
-        {ticket.completedAt ? (
-          format(new Date(ticket.createdAt).toLocaleString('dd/mm/yyyy'))) : (
+        {ticket.completedAt ? (new Date(ticket.createdAt).toLocaleString('en-GB')) : (
           '-'
         )}
       </td>
