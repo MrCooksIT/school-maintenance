@@ -4,6 +4,7 @@ import { ref, onValue } from 'firebase/database';
 import { database } from '@/config/firebase';
 import TicketDetailsModal from './tickets/TicketDetailsModal';
 import { DateRangePicker } from './DateRangePicker';
+import { format } from 'date-fns';
 import {
   Filter,
   MessageSquare,
@@ -34,15 +35,22 @@ const StatusBadge = ({ status }) => {
   const statusStyles = {
     new: "bg-blue-100 text-blue-800 border-blue-200",
     "in-progress": "bg-yellow-100 text-yellow-800 border-yellow-200",
+    "paused": "bg-purple-100 text-purple-800 border-purple-200",
     completed: "bg-green-100 text-green-800 border-green-200",
     overdue: "bg-red-100 text-red-800 border-red-200"
   };
 
-  const displayText = status === 'in-progress' ? 'IN PROGRESS' : status?.toUpperCase();
+  const getDisplayText = (status) => {
+    switch (status) {
+      case 'in-progress': return 'IN PROGRESS';
+      case 'paused': return 'PAUSED';
+      default: return status?.toUpperCase();
+    }
+  };
 
   return (
     <Badge className={`${statusStyles[status]} text-xs uppercase`}>
-      {displayText}
+      {getDisplayText(status)}
     </Badge>
   );
 };
@@ -75,7 +83,7 @@ const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
           : ticket.requester}
       </td>
       <td className="px-4 py-3 text-sm">
-        {ticket.dueDate ? new Date(ticket.dueDate).toLocaleDateString('en-ZA') : '-'}
+        {ticket.dueDate ? format(new Date(ticket.dueDate), 'dd/MM/yyyy') : '-'}
       </td>
       <td className="px-4 py-3 text-sm font-mono">{ticket.ticketId}</td>
       <td className="px-4 py-3">
@@ -96,11 +104,7 @@ const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
       </td>
       <td className="px-4 py-3 text-sm">
         {ticket.completedAt ? (
-          new Date(ticket.createdAt).toLocaleString('en-ZA', {
-            dateStyle: 'medium',
-            timeStyle: 'short'
-          })
-        ) : (
+          format(new Date(ticket.createdAt).toLocaleString('dd/mm/yyyy'))) : (
           '-'
         )}
       </td>

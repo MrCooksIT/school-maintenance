@@ -31,8 +31,8 @@ const MetricCard = ({ title, value, subValue, trend, trendValue }) => (
                 <p className="text-sm text-gray-500">{subValue}</p>
             </div>
             <div className={`flex items-center gap-1 text-sm ${trend === 'up' ? 'text-red-500' :
-                    trend === 'down' ? 'text-green-500' :
-                        'text-gray-500'
+                trend === 'down' ? 'text-green-500' :
+                    'text-gray-500'
                 }`}>
                 {trend === 'up' ? <TrendingUp className="h-4 w-4" /> :
                     trend === 'down' ? <TrendingDown className="h-4 w-4" /> :
@@ -83,11 +83,14 @@ const Analytics = () => {
             monthlyTrends: [],
             topPerformer: { name: 'No data', avgTime: 0 },
             overallAvg: 0,
-            openTickets: 0
+            openTickets: 0,
+            pausedTickets: 0
         };
 
         const staffPerformance = currentStaff.map(staff => {
             const staffTickets = tickets.filter(t => t.assignedTo === staff.id);
+            const activeTickets = staffTickets.filter(t => t.status !== 'completed' && t.status !== 'paused');
+            const pausedTickets = staffTickets.filter(t => t.status === 'paused');
             const completedTickets = staffTickets.filter(t => t.status === 'completed');
 
             const totalTime = completedTickets.reduce((acc, ticket) => {
@@ -100,10 +103,13 @@ const Analytics = () => {
                 name: staff.name,
                 avgTime: completedTickets.length ? Math.round(totalTime / completedTickets.length) : 0,
                 totalTickets: staffTickets.length,
+                activeTickets: activeTickets.length,
+                pausedTickets: pausedTickets.length,
                 completedTickets: completedTickets.length,
                 highPriorityTickets: staffTickets.filter(t => t.priority === 'high').length
             };
         });
+
 
         const monthlyTrends = Array.from({ length: 6 }, (_, i) => {
             const date = new Date();
@@ -120,12 +126,15 @@ const Analytics = () => {
                 month,
                 total: monthTickets.length,
                 completed: monthTickets.filter(t => t.status === 'completed').length,
+                paused: monthTickets.filter(t => t.status === 'paused').length,
                 avgResolutionTime: calculateAvgResolutionTime(monthTickets),
                 highPriority: monthTickets.filter(t => t.priority === 'high').length
             };
         }).reverse();
 
-        const openTickets = tickets.filter(t => t.status !== 'completed');
+        const openTickets = tickets.filter(t => t.status !== 'completed' && t.status !== 'paused');
+        const pausedTickets = tickets.filter(t => t.status === 'paused');
+
         const bestPerformer = staffPerformance.reduce((best, current) => {
             if (current.completedTickets === 0) return best;
             const bestScore = best.completedTickets / (best.avgTime || 1);
@@ -138,7 +147,8 @@ const Analytics = () => {
             monthlyTrends,
             topPerformer: bestPerformer,
             overallAvg: calculateAvgResolutionTime(tickets),
-            openTickets: openTickets.length
+            openTickets: openTickets.length,
+            pausedTickets: pausedTickets.length
         };
     };
 

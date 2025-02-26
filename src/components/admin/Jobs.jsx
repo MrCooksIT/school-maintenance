@@ -81,11 +81,15 @@ const Jobs = () => {
         const styles = {
             new: "bg-blue-100 text-blue-800 border-blue-200",
             "in-progress": "bg-yellow-100 text-yellow-800 border-yellow-200",
-            completed: "bg-green-100 text-green-800 border-green-200"
+            "paused": "bg-purple-100 text-purple-800 border-purple-200",
+            completed: "bg-green-100 text-green-800 border-green-200",
+            overdue: "bg-red-100 text-red-800 border-red-200"
         };
         return (
             <Badge className={styles[status] || styles.new}>
-                {status}
+                {status === 'in-progress' ? 'IN PROGRESS' :
+                    status === 'paused' ? 'PAUSED' :
+                        status?.toUpperCase()}
             </Badge>
         );
     };

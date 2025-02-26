@@ -62,7 +62,8 @@ const Workload = () => {
 
     const calculateWorkload = (staffMember) => {
         const staffTickets = tickets.filter(ticket => ticket.assignedTo === staffMember.id);
-        const activeTickets = staffTickets.filter(t => t.status !== 'completed');
+        const activeTickets = staffTickets.filter(t => t.status !== 'completed' && t.status !== 'paused');
+        const pausedTickets = staffTickets.filter(t => t.status === 'paused');
         const completedTickets = staffTickets.filter(t => t.status === 'completed');
         const highPriorityTickets = activeTickets.filter(t => t.priority === 'high');
         const dueSoonTickets = activeTickets.filter(t => {
@@ -76,11 +77,12 @@ const Workload = () => {
         return {
             total: staffTickets.length,
             active: activeTickets.length,
+            paused: pausedTickets.length,
             completed: completedTickets.length,
             highPriority: highPriorityTickets.length,
             dueSoon: dueSoonTickets.length,
-            tickets: activeTickets,
-            workloadScore: calculateWorkloadScore(activeTickets)
+            tickets: [...activeTickets, ...pausedTickets], // Include paused tickets in the display
+            workloadScore: calculateWorkloadScore(activeTickets) // But don't count them in workload score
         };
     };
 

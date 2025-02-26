@@ -54,6 +54,9 @@ const Calendar = () => {
     };
 
     const getPriorityColor = (priority) => {
+        if (ticket.status === 'paused') {
+            return 'bg-purple-500';
+        }
         switch (priority) {
             case 'high': return 'bg-red-500';
             case 'medium': return 'bg-yellow-500';
@@ -106,9 +109,8 @@ const Calendar = () => {
                         return (
                             <div
                                 key={index}
-                                className={`bg-white p-4 min-h-[120px] border ${
-                                    isToday(date) ? 'border-blue-500' : 'border-transparent'
-                                } ${!isSameMonth(date, currentDate) ? 'text-gray-400' : ''}`}
+                                className={`bg-white p-4 min-h-[120px] border ${isToday(date) ? 'border-blue-500' : 'border-transparent'
+                                    } ${!isSameMonth(date, currentDate) ? 'text-gray-400' : ''}`}
                             >
                                 <div className="font-medium mb-2">
                                     {format(date, 'd')}
@@ -119,7 +121,7 @@ const Calendar = () => {
                                             <Tooltip>
                                                 <TooltipTrigger>
                                                     <div className={`text-xs p-1 rounded ${getPriorityColor(ticket.priority)} text-white truncate`}>
-                                                        {ticket.subject}
+                                                        {ticket.status === 'paused' ? '⏸ ' : ''}{ticket.subject}
                                                     </div>
                                                 </TooltipTrigger>
                                                 <TooltipContent>

@@ -49,6 +49,52 @@
   }
 }
 
+.rdp-month {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  width: 100% !important;
+}
+
+.rdp-table {
+  margin: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+.rdp-caption {
+  padding: 0 4px 16px 4px !important;
+  text-align: center !important;
+}
+
+.rdp-head {
+  width: 100% !important;
+}
+
+.rdp-head_row,
+.rdp-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+}
+
+.rdp-head_cell,
+.rdp-cell {
+  flex: 1 !important;
+  text-align: center !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  min-width: 30px !important;
+}
+
+.rdp-button {
+  width: 100% !important;
+  height: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
 /* Scrollbar Styles */
 .custom-scrollbar {
   scrollbar-width: thin;
