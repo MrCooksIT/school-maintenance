@@ -1,4 +1,4 @@
-// src/components/tickets/FileUpload.jsx - Updated version with fixed layout
+// src/components/tickets/FileUpload.jsx
 import React, { useState, useEffect } from 'react';
 import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { ref as dbRef, push, onValue, remove } from 'firebase/database';
@@ -14,16 +14,19 @@ import {
     Loader2,
     FileTextIcon,
     Eye,
-    AlertTriangle
+    AlertTriangle,
+    Mail
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from "@/components/ui/use-toast";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export function FileUpload({ ticketId }) {
     const [files, setFiles] = useState([]);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadError, setUploadError] = useState(null);
+    const [activeTab, setActiveTab] = useState("all");
     const { toast } = useToast();
 
     useEffect(() => {
@@ -74,65 +77,35 @@ export function FileUpload({ ticketId }) {
             const fileName = `${timestamp}_${file.name}`;
             const filePath = `tickets/${ticketId}/${fileName}`;
 
-            // Log Firebase operation for debugging
-            console.log("Starting file upload to Firebase Storage:", filePath);
-
             // Upload to Firebase Storage
             const fileRef = storageRef(storage, filePath);
+            const snapshot = await uploadBytes(fileRef, file);
+            const downloadURL = await getDownloadURL(snapshot.ref);
 
-            // Show progress updates during upload
-            const uploadTask = uploadBytes(fileRef, file);
+            // Add file metadata to the database
+            const filesRef = dbRef(database, `tickets/${ticketId}/attachments`);
+            await push(filesRef, {
+                name: file.name,
+                type: file.type,
+                size: file.size,
+                url: downloadURL,
+                path: filePath,
+                uploadedAt: new Date().toISOString(),
+                source: 'manual' // This indicates it was manually uploaded
+            });
 
-            // Handle upload completion
-            const snapshot = await uploadTask;
-            console.log("File uploaded successfully!", snapshot);
-
-            // Get download URL
-            try {
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                console.log("Download URL obtained:", downloadURL);
-
-                // Add file metadata to the database
-                const filesRef = dbRef(database, `tickets/${ticketId}/attachments`);
-                await push(filesRef, {
-                    name: file.name,
-                    type: file.type,
-                    size: file.size,
-                    url: downloadURL,
-                    path: filePath,
-                    uploadedAt: new Date().toISOString(),
-                });
-
-                setUploadProgress(100);
-                toast({
-                    title: "File Uploaded",
-                    description: "Your file has been uploaded successfully",
-                    variant: "success",
-                });
-            } catch (urlError) {
-                console.error("Error getting download URL:", urlError);
-                setUploadError("Failed to get file download URL. CORS issue may be present.");
-                toast({
-                    title: "Upload Issue",
-                    description: "File uploaded but couldn't retrieve download URL. Please check Firebase Storage CORS settings.",
-                    variant: "warning",
-                });
-            }
+            setUploadProgress(100);
+            toast({
+                title: "File Uploaded",
+                description: "Your file has been uploaded successfully",
+                variant: "success",
+            });
         } catch (error) {
             console.error('Error uploading file:', error);
-
-            // Provide specific error messages based on error type
-            let errorMessage = "Failed to upload file. Please try again.";
-            if (error.code === "storage/unauthorized") {
-                errorMessage = "Storage permission denied. Check Firebase Storage rules.";
-            } else if (error.message && error.message.includes("CORS")) {
-                errorMessage = "CORS issue detected. Storage is not configured to allow uploads from this domain.";
-            }
-
-            setUploadError(errorMessage);
+            setUploadError("Failed to upload file. Please try again.");
             toast({
                 title: "Upload Failed",
-                description: errorMessage,
+                description: "Failed to upload file. Please try again.",
                 variant: "destructive",
             });
         } finally {
@@ -181,6 +154,14 @@ export function FileUpload({ ticketId }) {
         if (fileType.includes('pdf')) return <FileTextIcon className="h-5 w-5 text-red-500" />;
         return <FileIcon className="h-5 w-5 text-gray-500" />;
     };
+
+    // Filter files based on the active tab
+    const filteredFiles = files.filter(file => {
+        if (activeTab === "all") return true;
+        if (activeTab === "email") return file.source === 'email';
+        if (activeTab === "manual") return file.source === 'manual' || !file.source; // Support legacy files
+        return true;
+    });
 
     return (
         <div className="flex flex-col h-full">
@@ -251,17 +232,26 @@ export function FileUpload({ ticketId }) {
                 )}
             </div>
 
-            {/* Files List - Scrollable area */}
+            {/* Files Section with Tabs */}
             <div className="flex-1 overflow-auto p-6 bg-gray-50">
-                <h3 className="font-medium text-gray-700 mb-3">Uploaded Files</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-medium text-gray-700">Uploaded Files</h3>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
+                        <TabsList className="bg-white border">
+                            <TabsTrigger value="all" className="text-xs">All Files</TabsTrigger>
+                            <TabsTrigger value="email" className="text-xs">Email Attachments</TabsTrigger>
+                            <TabsTrigger value="manual" className="text-xs">Uploaded Files</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
 
-                {files.length === 0 ? (
+                {filteredFiles.length === 0 ? (
                     <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
-                        <p className="text-gray-500">No files uploaded yet</p>
+                        <p className="text-gray-500">No files found</p>
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {files.map((file) => (
+                        {filteredFiles.map((file) => (
                             <div
                                 key={file.id}
                                 className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg"
@@ -269,9 +259,17 @@ export function FileUpload({ ticketId }) {
                                 <div className="flex items-center gap-3">
                                     {getFileIcon(file.type)}
                                     <div>
-                                        <p className="font-medium text-sm">{file.name}</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-medium text-sm">{file.name}</p>
+                                            {file.source === 'email' && (
+                                                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full flex items-center">
+                                                    <Mail className="h-3 w-3 mr-1" />
+                                                    Email
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex gap-2 text-xs text-gray-500">
-                                            <span>{formatFileSize(file.size)}</span>
+                                            <span>{formatFileSize(file.size || 0)}</span>
                                             <span>•</span>
                                             <span>{format(new Date(file.uploadedAt), 'd MMM yyyy')}</span>
                                         </div>
