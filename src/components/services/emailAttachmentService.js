@@ -1,21 +1,21 @@
-// src/services/emailAttachmentService.js
+// src/services/EmailAttachmentService.js
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { ref as dbRef, push } from 'firebase/database';
+import { ref as dbRef, push, update } from 'firebase/database';
 import { storage, database } from '@/config/firebase';
 
 /**
- * Service to handle email attachments for maintenance tickets
+ * Service to handle email attachments for tickets
  */
-export const emailAttachmentService = {
+export const EmailAttachmentService = {
     /**
-     * Process and save email attachments to a ticket
+     * Process attachments from an email and add them to a ticket
      * @param {string} ticketId - The ID of the ticket
-     * @param {Array} attachments - Array of file objects from email
-     * @param {Object} emailMetadata - Email metadata (sender, date, etc.)
-     * @returns {Promise<Array>} - Array of processed attachment references
+     * @param {Array} attachments - Array of attachment objects from email
+     * @param {string} senderEmail - Email of sender for tracking purposes
+     * @returns {Promise<Array>} - Array of processed attachment objects
      */
-    async processEmailAttachments(ticketId, attachments, emailMetadata) {
-        if (!ticketId || !attachments || attachments.length === 0) {
+    async processEmailAttachments(ticketId, attachments, senderEmail) {
+        if (!ticketId || !attachments || !attachments.length) {
             return [];
         }
 
@@ -23,71 +23,89 @@ export const emailAttachmentService = {
 
         for (const attachment of attachments) {
             try {
-                // Generate a unique filename with timestamp
-                const timestamp = new Date().getTime();
-                const safeFileName = attachment.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-                const fileName = `${timestamp}_${safeFileName}`;
-                const filePath = `tickets/${ticketId}/email_attachments/${fileName}`;
+                // Skip non-image attachments if needed
+                if (!attachment.contentType.startsWith('image/')) {
+                    continue;
+                }
 
-                // Upload file to Firebase Storage
+                // Create a unique filename
+                const timestamp = new Date().getTime();
+                const fileName = `${timestamp}_${attachment.filename || 'email_attachment'}`;
+                const filePath = `tickets/${ticketId}/email/${fileName}`;
+
+                // Convert base64/attachment data to blob
+                const response = await fetch(attachment.data);
+                const blob = await response.blob();
+
+                // Upload to Firebase Storage
                 const fileRef = storageRef(storage, filePath);
-                const snapshot = await uploadBytes(fileRef, attachment.data);
+                const snapshot = await uploadBytes(fileRef, blob);
                 const downloadURL = await getDownloadURL(snapshot.ref);
 
                 // Add file metadata to the database
-                const attachmentsRef = dbRef(database, `tickets/${ticketId}/attachments`);
-                const newAttachment = await push(attachmentsRef, {
-                    name: attachment.name,
-                    type: attachment.type || this.detectMimeType(attachment.name),
-                    size: attachment.size,
+                const filesRef = dbRef(database, `tickets/${ticketId}/attachments`);
+                const newAttachmentRef = await push(filesRef, {
+                    name: attachment.filename || 'Email Attachment',
+                    type: attachment.contentType,
+                    size: blob.size,
                     url: downloadURL,
                     path: filePath,
                     uploadedAt: new Date().toISOString(),
                     source: 'email',
-                    emailData: {
-                        sender: emailMetadata.sender,
-                        subject: emailMetadata.subject,
-                        receivedAt: emailMetadata.date,
-                    }
+                    senderEmail: senderEmail
                 });
 
+                // Add to processed attachments
                 processedAttachments.push({
-                    id: newAttachment.key,
-                    name: attachment.name,
+                    id: newAttachmentRef.key,
+                    name: attachment.filename || 'Email Attachment',
                     url: downloadURL
                 });
             } catch (error) {
-                console.error(`Error processing email attachment: ${attachment.name}`, error);
+                console.error('Error processing email attachment:', error);
             }
+        }
+
+        // Update ticket to indicate it has email attachments
+        if (processedAttachments.length > 0) {
+            const ticketRef = dbRef(database, `tickets/${ticketId}`);
+            await update(ticketRef, {
+                hasEmailAttachments: true,
+                lastUpdated: new Date().toISOString()
+            });
         }
 
         return processedAttachments;
     },
 
     /**
-     * Detect MIME type from file extension
-     * @param {string} filename - The filename to analyze
-     * @returns {string} - The MIME type
+     * Parse email content to extract inline images
+     * @param {string} emailHtml - HTML content of the email
+     * @returns {Array} - Array of attachment objects
      */
-    detectMimeType(filename) {
-        const extension = filename.split('.').pop().toLowerCase();
+    extractInlineImages(emailHtml) {
+        // This is a simplified implementation - production code would need
+        // to handle various email formats and extract embedded images
+        const attachments = [];
 
-        const mimeTypes = {
-            'jpg': 'image/jpeg',
-            'jpeg': 'image/jpeg',
-            'png': 'image/png',
-            'gif': 'image/gif',
-            'pdf': 'application/pdf',
-            'doc': 'application/msword',
-            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'xls': 'application/vnd.ms-excel',
-            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'txt': 'text/plain',
-            'csv': 'text/csv'
-        };
+        // Simple regex to find base64 encoded images in HTML
+        const imgRegex = /<img[^>]+src="data:image\/([^;]+);base64,([^"]+)"/g;
+        let match;
 
-        return mimeTypes[extension] || 'application/octet-stream';
+        while ((match = imgRegex.exec(emailHtml)) !== null) {
+            const contentType = `image/${match[1]}`;
+            const base64Data = match[2];
+            const dataUrl = `data:${contentType};base64,${base64Data}`;
+
+            attachments.push({
+                filename: `inline_image_${attachments.length + 1}.${match[1]}`,
+                contentType: contentType,
+                data: dataUrl
+            });
+        }
+
+        return attachments;
     }
 };
 
-export default emailAttachmentService;
+export default EmailAttachmentService;

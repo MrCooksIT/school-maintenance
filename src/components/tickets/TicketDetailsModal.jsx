@@ -1,7 +1,7 @@
 // src/components/tickets/TicketDetailsModal.jsx
 import React, { useState, useEffect } from 'react';
 import PauseReasonModal from './PauseReasonModal';
-import { ref, update, onValue } from 'firebase/database';
+import { ref, update, onValue, push } from 'firebase/database';
 import { database } from '@/config/firebase';
 import {
   Dialog,
@@ -21,9 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Edit2, Save, X, MessageSquare, FileText, Calendar, Clock, MapPin } from 'lucide-react';
+import { Edit2, Save, X, MessageSquare, FileText, Calendar, Clock, MapPin, Paperclip } from 'lucide-react';
 import { TicketComments } from './TicketComments';
-import { FileUpload } from './FileUpload';
+import { FileAttachments } from './FileAttachments';
 import { useToast } from "@/components/ui/use-toast";
 import { format } from 'date-fns';
 
@@ -34,7 +34,6 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Completed' },
   { value: 'overdue', label: 'Overdue' }
 ];
-
 
 const PRIORITY_OPTIONS = [
   { value: 'high', label: 'High' },
@@ -66,8 +65,11 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
   const [editedData, setEditedData] = useState({});
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [attachmentCount, setAttachmentCount] = useState(0);
   const { toast } = useToast();
   const [isPauseModalOpen, setIsPauseModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
+
   useEffect(() => {
     if (ticket) {
       setEditedData(ticket);
@@ -90,6 +92,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
 
     return () => unsubscribe();
   }, []);
+
   useEffect(() => {
     const locationsRef = ref(database, 'locations');
     const unsubscribe = onValue(locationsRef, (snapshot) => {
@@ -107,16 +110,41 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
     return () => unsubscribe();
   }, []);
 
+  // Get attachment count
+  useEffect(() => {
+    if (!ticket) return;
+
+    // Count regular attachments
+    const attachmentsRef = ref(database, `tickets/${ticket.id}/attachments`);
+    const emailAttachmentsRef = ref(database, `tickets/${ticket.id}/emailAttachments`);
+
+    const attachmentsUnsubscribe = onValue(attachmentsRef, (snapshot) => {
+      const regularCount = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+
+      // Now check email attachments
+      const emailUnsubscribe = onValue(emailAttachmentsRef, (snapshot) => {
+        const emailCount = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+        setAttachmentCount(regularCount + emailCount);
+      });
+
+      return emailUnsubscribe;
+    });
+
+    return () => attachmentsUnsubscribe();
+  }, [ticket]);
+
   const getCategoryName = (categoryId) => {
     if (!categoryId || categoryId === 'none') return '';
     const category = categories.find(cat => cat.id === categoryId);
     return category ? category.name : categoryId;
   };
+
   const getLocationName = (locationId) => {
     if (!locationId || locationId === 'none') return '';
     const location = locations.find(loc => loc.id === locationId);
     return location ? location.name : locationId;
   };
+
   const handleQuickUpdate = async (field, value) => {
     if (!ticket) return;
     try {
@@ -142,6 +170,37 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
     }
   };
 
+  const handleSaveChanges = async () => {
+    const hasChanges = Object.entries(editedData).some(([key, value]) => {
+      return ticket[key] !== value && key !== 'lastUpdated';
+    });
+
+    if (hasChanges) {
+      const updates = { ...editedData, lastUpdated: new Date().toISOString() };
+      const ticketRef = ref(database, `tickets/${ticket.id}`);
+      update(ticketRef, updates).then(() => {
+        toast({
+          title: "Changes Saved",
+          description: "All changes have been saved successfully",
+          variant: "success"
+        });
+      }).catch(error => {
+        toast({
+          title: "Error",
+          description: "Failed to save changes",
+          variant: "destructive"
+        });
+        console.error('Error saving changes:', error);
+      });
+    } else {
+      toast({
+        title: "No Changes",
+        description: "No changes to save",
+        variant: "info"
+      });
+    }
+  };
+
   if (!ticket) {
     return null;
   }
@@ -152,7 +211,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
         className="w-full max-w-[90vw] md:max-w-4xl lg:max-w-5xl p-0 max-h-[90vh] overflow-hidden flex flex-col"
         aria-describedby="ticket-details-description"
       >
-
         <DialogHeader className="sr-only">
           <DialogTitle>Ticket Details: {ticket.ticketId}</DialogTitle>
           <DialogDescription id="ticket-details-description">
@@ -160,7 +218,8 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="p-6 border-b bg-[#0a1e46] text-white">
+        {/* Header Section */}
+        <div className="p-4 border-b bg-[#0a1e46] text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <span className="text-2xl font-bold">{ticket.ticketId}</span>
@@ -218,7 +277,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
           <div className="text-sm text-gray-300 mt-2 flex items-center gap-4">
             <div className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
-              Created:{format(new Date(ticket.createdAt), 'dd/MM/yyyy')}
+              Created: {format(new Date(ticket.createdAt), 'dd/MM/yyyy')}
             </div>
             {ticket.lastUpdated && (
               <div className="flex items-center gap-1">
@@ -226,10 +285,15 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                 Updated: {format(new Date(ticket.lastUpdated), 'dd/MM/yyyy')}
               </div>
             )}
+            <div className="flex items-center gap-1">
+              <Paperclip className="h-4 w-4" />
+              Files: {attachmentCount}
+            </div>
           </div>
         </div>
 
-        <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
+        {/* Main Content Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
           <div className="border-b bg-gray-100">
             <TabsList className="w-full rounded-none border-0 bg-transparent h-12">
               <TabsTrigger
@@ -248,15 +312,17 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                 value="files"
                 className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-[#0a1e46] data-[state=active]:text-[#0a1e46] text-gray-600 h-12"
               >
-                Files
+                Files {attachmentCount > 0 && `(${attachmentCount})`}
               </TabsTrigger>
             </TabsList>
           </div>
+
           <div className="flex-1 overflow-auto">
-            <TabsContent value="details" className="p-6 h-full">
+            {/* Details Tab */}
+            <TabsContent value="details" className="p-6 h-full" forceMount={activeTab === 'details'}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left column */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold text-gray-700">Subject</label>
                     <Input
@@ -300,7 +366,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                 </div>
 
                 {/* Right column */}
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <h3 className="text-base font-medium text-gray-800 mb-3">Ticket Information</h3>
 
@@ -314,7 +380,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                         </span>
                       </div>
 
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Due Date:</span>
                         <Input
                           type="date"
@@ -325,7 +391,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                         />
                       </div>
 
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-600">Category:</span>
                         <Select
                           value={editedData.category || 'none'}
@@ -351,7 +417,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                         <div className="flex justify-between">
                           <span className="text-sm text-gray-600">Completed On:</span>
                           <span className="text-sm font-medium">
-                            {Format(new Date(editedData.completedAt).toLocaleDateString('dd/mm/yyyy'))}
+                            {format(new Date(editedData.completedAt), 'dd/MM/yyyy')}
                           </span>
                         </div>
                       )}
@@ -378,38 +444,29 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                     </Select>
                   </div>
 
+                  {/* File Summary Panel */}
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 className="text-base font-medium text-gray-800 mb-3 flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Attached Files
+                    </h3>
+                    <div className="text-sm">
+                      {attachmentCount > 0 ? (
+                        <button
+                          className="text-blue-600 hover:underline flex items-center"
+                          onClick={() => setActiveTab('files')}
+                        >
+                          <span>View all {attachmentCount} files</span>
+                        </button>
+                      ) : (
+                        <span className="text-gray-500">No files attached</span>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="pt-4 flex gap-2">
                     <Button
-                      onClick={() => {
-                        const hasChanges = Object.entries(editedData).some(([key, value]) => {
-                          return ticket[key] !== value && key !== 'lastUpdated';
-                        });
-
-                        if (hasChanges) {
-                          const updates = { ...editedData, lastUpdated: new Date().toISOString() };
-                          const ticketRef = ref(database, `tickets/${ticket.id}`);
-                          update(ticketRef, updates).then(() => {
-                            toast({
-                              title: "Changes Saved",
-                              description: "All changes have been saved successfully",
-                              variant: "success"
-                            });
-                          }).catch(error => {
-                            toast({
-                              title: "Error",
-                              description: "Failed to save changes",
-                              variant: "destructive"
-                            });
-                            console.error('Error saving changes:', error);
-                          });
-                        } else {
-                          toast({
-                            title: "No Changes",
-                            description: "No changes to save",
-                            variant: "info"
-                          });
-                        }
-                      }}
+                      onClick={handleSaveChanges}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                     >
                       Save Changes
@@ -422,6 +479,16 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                             handleQuickUpdate('status', 'in-progress');
                             handleQuickUpdate('pausedAt', null);
                             handleQuickUpdate('pauseReason', null);
+
+                            // Add a system comment for resuming
+                            const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+                            push(commentsRef, {
+                              content: "Ticket resumed from pause status",
+                              user: 'System',
+                              userEmail: 'system@maintenance.app',
+                              timestamp: new Date().toISOString(),
+                              isSystemComment: true
+                            });
 
                             toast({
                               title: "Ticket Resumed",
@@ -448,44 +515,47 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
               </div>
             </TabsContent>
 
-            <TabsContent value="comments" className="p-0 h-[500px] flex flex-col">
+            {/* Comments Tab */}
+            <TabsContent value="comments" className="h-full" forceMount={activeTab === 'comments'}>
               <TicketComments ticketId={ticket.id} />
             </TabsContent>
 
-            <TabsContent value="files" className="p-0 h-[500px] flex flex-col">
-              <FileUpload ticketId={ticket.id} />
+            {/* Files Tab */}
+            <TabsContent value="files" className="h-full p-4" forceMount={activeTab === 'files'}>
+              <FileAttachments ticketId={ticket.id} />
             </TabsContent>
-            <PauseReasonModal
-              open={isPauseModalOpen}
-              onOpenChange={setIsPauseModalOpen}
-              onPause={(reason) => {
-                handleQuickUpdate('status', 'paused');
-                handleQuickUpdate('pausedAt', new Date().toISOString());
-                handleQuickUpdate('pauseReason', reason);
-
-                // Add a comment about the pause
-                const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
-                push(commentsRef, {
-                  content: `Ticket paused: ${reason}`,
-                  user: 'System',
-                  userEmail: 'system@maintenance.app',
-                  timestamp: new Date().toISOString(),
-                  isSystemComment: true
-                });
-
-                toast({
-                  title: "Ticket Paused",
-                  description: "The ticket has been put on hold",
-                  variant: "info"
-                });
-              }}
-            />
           </div>
         </Tabs>
+
+        {/* Pause Reason Modal */}
+        <PauseReasonModal
+          open={isPauseModalOpen}
+          onOpenChange={setIsPauseModalOpen}
+          onPause={(reason) => {
+            handleQuickUpdate('status', 'paused');
+            handleQuickUpdate('pausedAt', new Date().toISOString());
+            handleQuickUpdate('pauseReason', reason);
+
+            // Add a comment about the pause
+            const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+            push(commentsRef, {
+              content: `Ticket paused: ${reason}`,
+              user: 'System',
+              userEmail: 'system@maintenance.app',
+              timestamp: new Date().toISOString(),
+              isSystemComment: true
+            });
+
+            toast({
+              title: "Ticket Paused",
+              description: "The ticket has been put on hold",
+              variant: "info"
+            });
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
 };
-
 
 export default TicketDetailsModal;

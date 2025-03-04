@@ -1,4 +1,4 @@
-// src/config/firebase.js
+// Add these logs to src/config/firebase.js to verify configuration loading
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
@@ -14,6 +14,16 @@ const firebaseConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
+// Add debug logs to verify config
+console.log("Firebase config loading:", {
+    apiKeyExists: !!import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomainExists: !!import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    databaseURLExists: !!import.meta.env.VITE_FIREBASE_DATABASE_URL,
+    projectIdExists: !!import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucketExists: !!import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID
+});
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -21,6 +31,13 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const database = getDatabase(app);
 const storage = getStorage(app);
+
+// Log services initialization
+console.log("Firebase services initialized:", {
+    authInitialized: !!auth,
+    databaseInitialized: !!database,
+    storageInitialized: !!storage
+});
 
 // Export services
 export { auth, database, storage };
