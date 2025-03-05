@@ -1,5 +1,5 @@
 // src/components/tickets/PauseReasonModal.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -19,114 +19,64 @@ import {
 } from "@/components/ui/select";
 import { AlertCircle } from 'lucide-react';
 
-// Enhanced pause reasons with more details
+// Simple pause reasons
 const PAUSE_REASONS = [
-    {
-        value: 'awaiting_parts',
-        label: 'Awaiting Parts',
-        requiresApproval: true,
-        category: 'procurement'
-    },
-    {
-        value: 'awaiting_info',
-        label: 'Awaiting More Information',
-        requiresApproval: false,
-        category: 'communication'
-    },
-    {
-        value: 'vendor_scheduling',
-        label: 'Vendor Scheduling',
-        requiresApproval: true,
-        category: 'external'
-    },
-    {
-        value: 'budget_approval',
-        label: 'Budget Approval Required',
-        requiresApproval: true,
-        category: 'financial'
-    },
-    {
-        value: 'out_of_stock',
-        label: 'Parts Out of Stock',
-        requiresApproval: true,
-        category: 'procurement'
-    },
-    {
-        value: 'pending_purchase',
-        label: 'Pending Purchase Order',
-        requiresApproval: true,
-        category: 'procurement'
-    },
-    {
-        value: 'staff_unavailable',
-        label: 'Staff Unavailable',
-        requiresApproval: false,
-        category: 'internal'
-    },
-    {
-        value: 'other',
-        label: 'Other Reason',
-        requiresApproval: false,
-        category: 'general'
-    }
+    { value: 'awaiting_parts', label: 'Awaiting Parts', category: 'procurement' },
+    { value: 'awaiting_info', label: 'Awaiting More Information', category: 'communication' },
+    { value: 'vendor_scheduling', label: 'Vendor Scheduling', category: 'external' },
+    { value: 'budget_approval', label: 'Budget Approval Required', category: 'financial' },
+    { value: 'out_of_stock', label: 'Parts Out of Stock', category: 'procurement' },
+    { value: 'staff_unavailable', label: 'Staff Unavailable', category: 'internal' },
+    { value: 'other', label: 'Other Reason', category: 'general' }
 ];
 
 const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
     const [reason, setReason] = useState('awaiting_parts');
     const [customReason, setCustomReason] = useState('');
-    const [estimatedDuration, setEstimatedDuration] = useState('');
+    const [estimatedDuration, setEstimatedDuration] = useState('1_week');
     const [notifySupervisor, setNotifySupervisor] = useState(false);
 
-    // Auto-set notify supervisor based on reason category
+    // Simple selected reason lookup
     const selectedReason = PAUSE_REASONS.find(r => r.value === reason);
     const isProcurement = selectedReason?.category === 'procurement';
-    const requiresApproval = selectedReason?.requiresApproval || false;
-
-    // Set notifySupervisor when reason changes
-    useEffect(() => {
-        // Auto-enable notifications for procurement/approval issues
-        if (isProcurement || requiresApproval) {
-            setNotifySupervisor(true);
-        }
-    }, [reason, isProcurement, requiresApproval]);
 
     const handleSubmit = () => {
-        const pauseReason = reason === 'other'
+        // Get display text for the reason
+        const reasonText = reason === 'other'
             ? customReason
             : PAUSE_REASONS.find(r => r.value === reason)?.label || 'Unknown';
 
-        // Enhanced pause data
+        // Create simplified pause data
         const pauseData = {
-            reason: pauseReason,
+            reason: reasonText,
             reasonCode: reason,
             estimatedDuration: estimatedDuration,
             category: selectedReason?.category,
-            requiresApproval: requiresApproval,
-            notifySupervisor: notifySupervisor,
-            timestamp: new Date().toISOString(),
+            notifySupervisor: notifySupervisor || isProcurement,
+            timestamp: new Date().toISOString()
         };
 
+        // Pass the data back to the parent
         onPause(pauseData);
-        onOpenChange(false);
+
+        // Don't close the dialog here - let the parent handle it
     };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>Pause Ticket</DialogTitle>
                     <DialogDescription>
-                        Provide a reason for pausing this ticket. This will be documented in the ticket history.
+                        Provide a reason for pausing this ticket.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
+                    {/* Reason Selection */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Reason for Pausing</label>
-                        <Select
-                            value={reason}
-                            onValueChange={setReason}
-                        >
+                        <Select value={reason} onValueChange={setReason}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select reason" />
                             </SelectTrigger>
@@ -140,26 +90,25 @@ const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
                         </Select>
                     </div>
 
+                    {/* Custom Reason Field */}
                     {reason === 'other' && (
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Specify Reason</label>
                             <Textarea
                                 value={customReason}
                                 onChange={(e) => setCustomReason(e.target.value)}
-                                placeholder="Enter specific reason for pausing this ticket"
+                                placeholder="Enter specific reason"
                                 className="min-h-[80px]"
                             />
                         </div>
                     )}
 
+                    {/* Duration Selection */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Estimated Duration</label>
-                        <Select
-                            value={estimatedDuration}
-                            onValueChange={setEstimatedDuration}
-                        >
+                        <Select value={estimatedDuration} onValueChange={setEstimatedDuration}>
                             <SelectTrigger>
-                                <SelectValue placeholder="How long will this ticket be paused?" />
+                                <SelectValue placeholder="How long will this be paused?" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="1_day">1 Day</SelectItem>
@@ -172,14 +121,13 @@ const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
                         </Select>
                     </div>
 
-                    {/* Simple checkbox instead of Switch component */}
+                    {/* Notification Checkbox */}
                     <div className="flex items-center gap-2 pt-2">
                         <input
                             type="checkbox"
                             id="notify-supervisor"
                             checked={notifySupervisor}
                             onChange={(e) => setNotifySupervisor(e.target.checked)}
-                            disabled={isProcurement || requiresApproval}
                             className="h-4 w-4"
                         />
                         <label htmlFor="notify-supervisor" className="text-sm">
@@ -187,13 +135,11 @@ const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
                         </label>
                     </div>
 
-                    {(isProcurement || requiresApproval) && (
+                    {/* Procurement Info */}
+                    {isProcurement && (
                         <div className="bg-blue-50 p-3 rounded-md flex gap-2 text-sm text-blue-800">
                             <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                            <div>
-                                <p>This pause reason requires supervisor notification.</p>
-                                <p>Estate manager will be automatically notified of procurement-related pauses.</p>
-                            </div>
+                            <p>Estate manager will be notified about this procurement-related pause.</p>
                         </div>
                     )}
                 </div>
@@ -204,8 +150,8 @@ const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
                     </Button>
                     <Button
                         onClick={handleSubmit}
-                        className="bg-purple-600 hover:bg-purple-700"
-                        disabled={reason === 'other' && !customReason.trim() || !estimatedDuration}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                        disabled={reason === 'other' && !customReason.trim()}
                     >
                         Pause Ticket
                     </Button>
