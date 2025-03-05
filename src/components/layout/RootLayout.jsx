@@ -17,6 +17,7 @@ import {
     Wrench,
     FolderOpen
 } from 'lucide-react';
+import NotificationBell from '../NotificationBell';
 
 // Sidebar Toggle Button Component
 const SidebarToggle = ({ toggleSidebar }) => (
@@ -98,7 +99,7 @@ const Header = ({ toggleSidebar }) => (
 
         {/* Icons on the right */}
         <div className="flex items-center gap-4">
-            <Bell className="h-5 w-5" />
+            <NotificationBell userRole={currentUser.role} />
             <UserCircle className="h-6 w-6" />
         </div>
     </div>

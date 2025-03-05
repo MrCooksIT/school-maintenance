@@ -26,6 +26,9 @@ import { TicketComments } from './TicketComments';
 import { FileAttachments } from './FileAttachments';
 import { useToast } from "@/components/ui/use-toast";
 import { format } from 'date-fns';
+import NotificationService from '../services/notificationService';
+import { useAuth } from '@/components/auth/AuthProvider';
+
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
@@ -69,6 +72,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
   const { toast } = useToast();
   const [isPauseModalOpen, setIsPauseModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
+  const { user } = useAuth();
 
   useEffect(() => {
     if (ticket) {
@@ -531,20 +535,39 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
         <PauseReasonModal
           open={isPauseModalOpen}
           onOpenChange={setIsPauseModalOpen}
-          onPause={(reason) => {
+          onPause={(pauseData) => {
+            // Set status to paused
             handleQuickUpdate('status', 'paused');
             handleQuickUpdate('pausedAt', new Date().toISOString());
-            handleQuickUpdate('pauseReason', reason);
+            handleQuickUpdate('pauseReason', pauseData.reason);
+            handleQuickUpdate('pauseData', pauseData);
 
             // Add a comment about the pause
             const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
             push(commentsRef, {
-              content: `Ticket paused: ${reason}`,
+              content: `Ticket paused: ${pauseData.reason}${pauseData.estimatedDuration ? ` - Estimated duration: ${pauseData.estimatedDuration.replace('_', ' ')}` : ''}`,
               user: 'System',
               userEmail: 'system@maintenance.app',
               timestamp: new Date().toISOString(),
               isSystemComment: true
             });
+
+            // Send notifications to supervisor/estate manager if needed
+            if (pauseData.notifySupervisor || pauseData.category === 'procurement') {
+              NotificationService.sendPauseNotification(
+                ticket,
+                pauseData,
+                user?.uid || 'unknown-user'
+              ).then(success => {
+                if (success) {
+                  toast({
+                    title: "Notifications Sent",
+                    description: `Supervisor${pauseData.category === 'procurement' ? ' and Estate Manager' : ''} have been notified`,
+                    variant: "info"
+                  });
+                }
+              });
+            }
 
             toast({
               title: "Ticket Paused",
