@@ -1,5 +1,5 @@
 // src/components/tickets/PauseReasonModal.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -17,8 +17,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { AlertCircle } from 'lucide-react';
 
 // Enhanced pause reasons with more details
@@ -85,7 +83,7 @@ const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
     const requiresApproval = selectedReason?.requiresApproval || false;
 
     // Set notifySupervisor when reason changes
-    React.useEffect(() => {
+    useEffect(() => {
         // Auto-enable notifications for procurement/approval issues
         if (isProcurement || requiresApproval) {
             setNotifySupervisor(true);
@@ -124,7 +122,7 @@ const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
 
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label className="text-sm font-medium">Reason for Pausing</Label>
+                        <label className="text-sm font-medium">Reason for Pausing</label>
                         <Select
                             value={reason}
                             onValueChange={setReason}
@@ -144,7 +142,7 @@ const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
 
                     {reason === 'other' && (
                         <div className="space-y-2">
-                            <Label className="text-sm font-medium">Specify Reason</Label>
+                            <label className="text-sm font-medium">Specify Reason</label>
                             <Textarea
                                 value={customReason}
                                 onChange={(e) => setCustomReason(e.target.value)}
@@ -155,7 +153,7 @@ const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
                     )}
 
                     <div className="space-y-2">
-                        <Label className="text-sm font-medium">Estimated Duration</Label>
+                        <label className="text-sm font-medium">Estimated Duration</label>
                         <Select
                             value={estimatedDuration}
                             onValueChange={setEstimatedDuration}
@@ -174,17 +172,19 @@ const PauseReasonModal = ({ open, onOpenChange, onPause }) => {
                         </Select>
                     </div>
 
-                    {/* Notification options */}
-                    <div className="flex items-center space-x-2 pt-2">
-                        <Switch
+                    {/* Simple checkbox instead of Switch component */}
+                    <div className="flex items-center gap-2 pt-2">
+                        <input
+                            type="checkbox"
                             id="notify-supervisor"
                             checked={notifySupervisor}
-                            onCheckedChange={setNotifySupervisor}
+                            onChange={(e) => setNotifySupervisor(e.target.checked)}
                             disabled={isProcurement || requiresApproval}
+                            className="h-4 w-4"
                         />
-                        <Label htmlFor="notify-supervisor">
+                        <label htmlFor="notify-supervisor" className="text-sm">
                             Notify supervisor about this pause
-                        </Label>
+                        </label>
                     </div>
 
                     {(isProcurement || requiresApproval) && (
