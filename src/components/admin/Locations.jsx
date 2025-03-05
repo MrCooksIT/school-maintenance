@@ -17,7 +17,6 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 import {
     Building,
@@ -27,6 +26,7 @@ import {
     MapPin,
     Building2
 } from 'lucide-react';
+import { useToast } from "@/components/ui/use-toast";
 
 const Locations = () => {
     const [locations, setLocations] = useState([]);
@@ -40,6 +40,7 @@ const Locations = () => {
     const [editingLocation, setEditingLocation] = useState(null);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const { toast } = useToast();
 
     useEffect(() => {
         const locationsRef = ref(database, 'locations');
@@ -59,6 +60,15 @@ const Locations = () => {
     }, []);
 
     const handleAddLocation = async () => {
+        if (!newLocation.name) {
+            toast({
+                title: "Validation Error",
+                description: "Location name is required",
+                variant: "destructive"
+            });
+            return;
+        }
+
         try {
             const locationsRef = ref(database, 'locations');
             await push(locationsRef, {
@@ -67,13 +77,34 @@ const Locations = () => {
             });
             setNewLocation({ name: '', building: '', floor: '', description: '', type: '' });
             setIsAddDialogOpen(false);
+
+            toast({
+                title: "Location Added",
+                description: `${newLocation.name} has been added successfully`,
+                variant: "success"
+            });
         } catch (error) {
             console.error('Error adding location:', error);
+            toast({
+                title: "Error",
+                description: "Failed to add location",
+                variant: "destructive"
+            });
         }
     };
 
     const handleEditLocation = async () => {
         if (!editingLocation) return;
+
+        if (!editingLocation.name) {
+            toast({
+                title: "Validation Error",
+                description: "Location name is required",
+                variant: "destructive"
+            });
+            return;
+        }
+
         try {
             const locationRef = ref(database, `locations/${editingLocation.id}`);
             await update(locationRef, {
@@ -82,97 +113,156 @@ const Locations = () => {
             });
             setEditingLocation(null);
             setIsEditDialogOpen(false);
+
+            toast({
+                title: "Location Updated",
+                description: `${editingLocation.name} has been updated successfully`,
+                variant: "success"
+            });
         } catch (error) {
             console.error('Error updating location:', error);
+            toast({
+                title: "Error",
+                description: "Failed to update location",
+                variant: "destructive"
+            });
         }
     };
 
     const handleDeleteLocation = async (locationId) => {
-        if (!window.confirm('Are you sure you want to delete this location?')) return;
+        // Find the location name for the toast notification
+        const locationToDelete = locations.find(loc => loc.id === locationId);
+
         try {
+            // Use ConfirmationDialog instead of the built-in confirm
+            const confirmDelete = window.confirm('Are you sure you want to delete this location?');
+            if (!confirmDelete) return;
+
             await remove(ref(database, `locations/${locationId}`));
+
+            toast({
+                title: "Location Deleted",
+                description: locationToDelete ? `${locationToDelete.name} has been deleted` : "Location has been deleted",
+                variant: "success"
+            });
         } catch (error) {
             console.error('Error deleting location:', error);
+            toast({
+                title: "Error",
+                description: "Failed to delete location",
+                variant: "destructive"
+            });
         }
     };
 
-    const LocationDialog = ({ isOpen, onOpenChange, location, onSave, isEditing = false }) => (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{isEditing ? 'Edit Location' : 'Add New Location'}</DialogTitle>
-                    <DialogDescription>
-                        {isEditing ? 'Update location details' : 'Add a new maintenance location'}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <label>Name</label>
-                        <Input
-                            placeholder="Location name"
-                            value={isEditing ? location?.name : newLocation.name}
-                            onChange={(e) => isEditing
-                                ? setEditingLocation(prev => ({ ...prev, name: e.target.value }))
-                                : setNewLocation(prev => ({ ...prev, name: e.target.value }))
-                            }
-                        />
+    // LocationDialog component with local state for form control
+    const LocationDialog = ({ isOpen, onOpenChange, location, onSave, isEditing = false }) => {
+        // Create local state for form inputs
+        const [formData, setFormData] = useState({
+            name: '',
+            building: '',
+            floor: '',
+            type: '',
+            description: ''
+        });
+
+        // Initialize form data when the dialog opens or location changes
+        useEffect(() => {
+            if (isEditing && location) {
+                setFormData({
+                    name: location.name || '',
+                    building: location.building || '',
+                    floor: location.floor || '',
+                    type: location.type || '',
+                    description: location.description || ''
+                });
+            } else {
+                setFormData({
+                    name: '',
+                    building: '',
+                    floor: '',
+                    type: '',
+                    description: ''
+                });
+            }
+        }, [isOpen, location, isEditing]);
+
+        // Handle form submission
+        const handleSubmit = () => {
+            if (isEditing) {
+                setEditingLocation({
+                    ...location,
+                    ...formData
+                });
+            } else {
+                setNewLocation(formData);
+            }
+            onSave();
+        };
+
+        return (
+            <Dialog open={isOpen} onOpenChange={onOpenChange}>
+                <DialogContent className="sm:max-w-[550px] p-6">
+                    <DialogHeader className="mb-4">
+                        <DialogTitle>{isEditing ? 'Edit Location' : 'Add New Location'}</DialogTitle>
+                        <DialogDescription>
+                            {isEditing ? 'Update location details' : 'Add a new maintenance location'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Name</label>
+                            <Input
+                                placeholder="Location name"
+                                value={formData.name}
+                                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Building</label>
+                            <Input
+                                placeholder="Building"
+                                value={formData.building}
+                                onChange={(e) => setFormData(prev => ({ ...prev, building: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Floor</label>
+                            <Input
+                                placeholder="Floor"
+                                value={formData.floor}
+                                onChange={(e) => setFormData(prev => ({ ...prev, floor: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Type</label>
+                            <Input
+                                placeholder="Location type (e.g., Classroom, Office, Lab)"
+                                value={formData.type}
+                                onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Description</label>
+                            <Input
+                                placeholder="Description"
+                                value={formData.description}
+                                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                            />
+                        </div>
                     </div>
-                    <div className="space-y-2">
-                        <label>Building</label>
-                        <Input
-                            placeholder="Building"
-                            value={isEditing ? location?.building : newLocation.building}
-                            onChange={(e) => isEditing
-                                ? setEditingLocation(prev => ({ ...prev, building: e.target.value }))
-                                : setNewLocation(prev => ({ ...prev, building: e.target.value }))
-                            }
-                        />
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSubmit}>
+                            {isEditing ? 'Update Location' : 'Add Location'}
+                        </Button>
                     </div>
-                    <div className="space-y-2">
-                        <label>Floor</label>
-                        <Input
-                            placeholder="Floor"
-                            value={isEditing ? location?.floor : newLocation.floor}
-                            onChange={(e) => isEditing
-                                ? setEditingLocation(prev => ({ ...prev, floor: e.target.value }))
-                                : setNewLocation(prev => ({ ...prev, floor: e.target.value }))
-                            }
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label>Type</label>
-                        <Input
-                            placeholder="Location type"
-                            value={isEditing ? location?.type : newLocation.type}
-                            onChange={(e) => isEditing
-                                ? setEditingLocation(prev => ({ ...prev, type: e.target.value }))
-                                : setNewLocation(prev => ({ ...prev, type: e.target.value }))
-                            }
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label>Description</label>
-                        <Input
-                            placeholder="Description"
-                            value={isEditing ? location?.description : newLocation.description}
-                            onChange={(e) => isEditing
-                                ? setEditingLocation(prev => ({ ...prev, description: e.target.value }))
-                                : setNewLocation(prev => ({ ...prev, description: e.target.value }))
-                            }
-                        />
-                    </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Cancel
-                    </Button>
-                    <Button onClick={onSave}>
-                        {isEditing ? 'Update Location' : 'Add Location'}
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
+                </DialogContent>
+            </Dialog>
+        );
+    };
 
     return (
         <div className="p-6 space-y-6">

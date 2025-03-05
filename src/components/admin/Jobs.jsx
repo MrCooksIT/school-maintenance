@@ -10,18 +10,32 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/Avatar";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import {
     User,
     Clock,
     AlertCircle,
     CheckCircle,
-    AlertTriangle
+    AlertTriangle,
+    ArrowUpDown,
+    Filter
 } from 'lucide-react';
+import { useToast } from "@/components/ui/use-toast";
 
 const Jobs = () => {
     const [tickets, setTickets] = useState([]);
     const [staff, setStaff] = useState([]);
+    const [sortBy, setSortBy] = useState('name');
+    const [showEmpty, setShowEmpty] = useState(true);
+    const { toast } = useToast();
 
     useEffect(() => {
         const ticketsRef = ref(database, 'tickets');
@@ -94,79 +108,135 @@ const Jobs = () => {
         );
     };
 
-    return (
-        <div className="space-y-6">
-            {staff.map((member) => {
-                const workload = getStaffWorkload(member.id);
+    // Sort staff members based on the selected sort option
+    const sortedStaff = [...staff].sort((a, b) => {
+        switch (sortBy) {
+            case 'name':
+                return a.name.localeCompare(b.name);
+            case 'taskCount':
+                return getStaffWorkload(b.id).active - getStaffWorkload(a.id).active;
+            case 'department':
+                return a.department.localeCompare(b.department);
+            default:
+                return 0;
+        }
+    });
 
-                return (
-                    <Card key={member.id}>
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <Avatar>
-                                        <AvatarFallback>
-                                            {member.name.split(' ').map(n => n[0]).join('')}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <CardTitle>{member.name}</CardTitle>
-                                        <CardDescription>{member.department}</CardDescription>
-                                    </div>
-                                </div>
-                                <div className="flex gap-4">
-                                    <div className="flex items-center gap-2">
-                                        <Clock className="h-4 w-4 text-blue-500" />
-                                        <span>{workload.active} active</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <AlertCircle className="h-4 w-4 text-red-500" />
-                                        <span>{workload.highPriority} high priority</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <CheckCircle className="h-4 w-4 text-green-500" />
-                                        <span>{workload.completed} completed</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                {workload.tickets
-                                    .filter(ticket => ticket.status !== 'completed')
-                                    .map(ticket => (
-                                        <div
-                                            key={ticket.id}
-                                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                                        >
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium">{ticket.subject}</span>
-                                                    {getPriorityBadge(ticket.priority)}
-                                                    {getStatusBadge(ticket.status)}
-                                                </div>
-                                                <p className="text-sm text-gray-500">{ticket.description}</p>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                {ticket.dueDate && (
-                                                    <div className="flex items-center gap-2 text-sm">
-                                                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                                                        Due {new Date(ticket.dueDate).toLocaleDateString('en-ZA')}
-                                                    </div>
-                                                )}
-                                            </div>
+    // Filter staff members if showEmpty is false
+    const filteredStaff = showEmpty
+        ? sortedStaff
+        : sortedStaff.filter(member => getStaffWorkload(member.id).active > 0);
+
+    return (
+        <div className="space-y-6 p-6">
+            <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+                <h2 className="text-xl font-bold">Staff Assignments</h2>
+                <div className="flex gap-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">Sort by:</span>
+                        <Select value={sortBy} onValueChange={setSortBy}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Sort by..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="name">Name</SelectItem>
+                                <SelectItem value="department">Department</SelectItem>
+                                <SelectItem value="taskCount">Task Count</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Button
+                        variant="outline"
+                        onClick={() => setShowEmpty(!showEmpty)}
+                        className={!showEmpty ? "bg-blue-50 border-blue-200" : ""}
+                    >
+                        <Filter className="h-4 w-4 mr-2" />
+                        {showEmpty ? "Hide Empty" : "Show All"}
+                    </Button>
+                </div>
+            </div>
+
+            {filteredStaff.length === 0 ? (
+                <div className="bg-white p-8 text-center rounded-lg shadow-sm">
+                    <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No staff members found</h3>
+                    <p className="text-gray-500">
+                        {showEmpty ? "No staff members in the system." : "No staff members with active tickets."}
+                    </p>
+                </div>
+            ) : (
+                filteredStaff.map((member) => {
+                    const workload = getStaffWorkload(member.id);
+
+                    return (
+                        <Card key={member.id}>
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <Avatar>
+                                            <AvatarFallback>
+                                                {member.name.split(' ').map(n => n[0]).join('')}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <CardTitle>{member.name}</CardTitle>
+                                            <CardDescription>{member.department}</CardDescription>
                                         </div>
-                                    ))}
-                                {workload.tickets.filter(ticket => ticket.status !== 'completed').length === 0 && (
-                                    <div className="text-center py-6 text-gray-500">
-                                        No active tickets
                                     </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                );
-            })}
+                                    <div className="flex gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="h-4 w-4 text-blue-500" />
+                                            <span>{workload.active} active</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <AlertCircle className="h-4 w-4 text-red-500" />
+                                            <span>{workload.highPriority} high priority</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircle className="h-4 w-4 text-green-500" />
+                                            <span>{workload.completed} completed</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    {workload.tickets
+                                        .filter(ticket => ticket.status !== 'completed')
+                                        .map(ticket => (
+                                            <div
+                                                key={ticket.id}
+                                                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                                            >
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium">{ticket.subject}</span>
+                                                        {getPriorityBadge(ticket.priority)}
+                                                        {getStatusBadge(ticket.status)}
+                                                    </div>
+                                                    <p className="text-sm text-gray-500">{ticket.description}</p>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    {ticket.dueDate && (
+                                                        <div className="flex items-center gap-2 text-sm">
+                                                            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                                                            Due {new Date(ticket.dueDate).toLocaleDateString('en-ZA')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    {workload.tickets.filter(ticket => ticket.status !== 'completed').length === 0 && (
+                                        <div className="text-center py-6 text-gray-500">
+                                            No active tickets
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                })
+            )}
         </div>
     );
 };

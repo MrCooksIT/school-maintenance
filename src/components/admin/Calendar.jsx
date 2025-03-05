@@ -53,8 +53,9 @@ const Calendar = () => {
         });
     };
 
-    const getPriorityColor = (priority) => {
-        if (ticket.status === 'paused') {
+    // Fixed function - removed dependency on undefined 'ticket' variable
+    const getPriorityColor = (priority, status) => {
+        if (status === 'paused') {
             return 'bg-purple-500';
         }
         switch (priority) {
@@ -120,7 +121,7 @@ const Calendar = () => {
                                         <TooltipProvider key={ticket.id}>
                                             <Tooltip>
                                                 <TooltipTrigger>
-                                                    <div className={`text-xs p-1 rounded ${getPriorityColor(ticket.priority)} text-white truncate`}>
+                                                    <div className={`text-xs p-1 rounded ${getPriorityColor(ticket.priority, ticket.status)} text-white truncate`}>
                                                         {ticket.status === 'paused' ? '⏸ ' : ''}{ticket.subject}
                                                     </div>
                                                 </TooltipTrigger>
