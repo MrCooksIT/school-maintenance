@@ -1,5 +1,6 @@
 // src/components/layout/RootLayout.jsx
 import React, { useState } from 'react';
+import { useAuth } from '../auth/AuthProvider';
 import { Link, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -84,7 +85,10 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     );
 };
 
-const Header = ({ toggleSidebar }) => (
+const Header = ({ toggleSidebar }) => {
+    const { userRole } = useAuth(); 
+    const role = userRole || 'staff'; 
+    return (
     <div className="bg-[#0a1e46] text-white h-16 flex items-center justify-between px-6 shadow-lg fixed top-0 right-0 left-0 z-40">
         {/* Sidebar toggle button */}
         <SidebarToggle toggleSidebar={toggleSidebar} />
@@ -99,11 +103,12 @@ const Header = ({ toggleSidebar }) => (
 
         {/* Icons on the right */}
         <div className="flex items-center gap-4">
-            <NotificationBell userRole={currentUser.role} />
+            <NotificationBell userRole={userRole} />
             <UserCircle className="h-6 w-6" />
         </div>
     </div>
 );
+};
 
 const RootLayout = ({ children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
