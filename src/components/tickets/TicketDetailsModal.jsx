@@ -29,7 +29,6 @@ import { format } from 'date-fns';
 import NotificationService from '../services/notificationService';
 import { useAuth } from '@/components/auth/AuthProvider';
 
-
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
   { value: 'in-progress', label: 'In Progress' },
@@ -217,7 +216,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
         className="w-full max-w-[90vw] md:max-w-4xl lg:max-w-5xl p-0 max-h-[90vh] overflow-hidden flex flex-col"
         aria-describedby={dialogDescriptionId}
       >
-        <DialogHeader>
+        <DialogHeader className="p-4 bg-white">
           <DialogTitle>Ticket Details: {ticket.ticketId}</DialogTitle>
           <DialogDescription id={dialogDescriptionId}>
             View and manage details, comments, and files for ticket {ticket.ticketId}
@@ -325,211 +324,217 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
 
           <div className="flex-1 overflow-auto">
             {/* Details Tab */}
-            <TabsContent value="details" className="p-6 h-full" forceMount={activeTab === 'details'}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Left column */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700">Subject</label>
-                    <Input
-                      value={editedData.subject || ''}
-                      onChange={(e) => setEditedData(prev => ({ ...prev, subject: e.target.value }))}
-                      onBlur={() => editedData.subject !== ticket.subject && handleQuickUpdate('subject', editedData.subject)}
-                      className="border-gray-300"
-                    />
+            {activeTab === 'details' && (
+              <div className="p-6 h-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left column */}
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Subject</label>
+                      <Input
+                        value={editedData.subject || ''}
+                        onChange={(e) => setEditedData(prev => ({ ...prev, subject: e.target.value }))}
+                        onBlur={() => editedData.subject !== ticket.subject && handleQuickUpdate('subject', editedData.subject)}
+                        className="border-gray-300"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Description</label>
+                      <Textarea
+                        value={editedData.description || ''}
+                        onChange={(e) => setEditedData(prev => ({ ...prev, description: e.target.value }))}
+                        onBlur={() => editedData.description !== ticket.description && handleQuickUpdate('description', editedData.description)}
+                        className="border-gray-300 min-h-[150px]"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-gray-700">Location</label>
+                      <Select
+                        value={editedData.location || 'none'}
+                        onValueChange={(value) => handleQuickUpdate('location', value === 'none' ? null : value)}
+                      >
+                        <SelectTrigger className="border-gray-300">
+                          <SelectValue placeholder="Select location">
+                            {getLocationName(editedData.location) || "Select location"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700">Description</label>
-                    <Textarea
-                      value={editedData.description || ''}
-                      onChange={(e) => setEditedData(prev => ({ ...prev, description: e.target.value }))}
-                      onBlur={() => editedData.description !== ticket.description && handleQuickUpdate('description', editedData.description)}
-                      className="border-gray-300 min-h-[150px]"
-                    />
-                  </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700">Location</label>
-                    <Select
-                      value={editedData.location || 'none'}
-                      onValueChange={(value) => handleQuickUpdate('location', value === 'none' ? null : value)}
-                    >
-                      <SelectTrigger className="border-gray-300">
-                        <SelectValue placeholder="Select location">
-                          {getLocationName(editedData.location) || "Select location"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        {locations.map((location) => (
-                          <SelectItem key={location.id} value={location.id}>
-                            {location.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                  {/* Right column */}
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <h3 className="text-base font-medium text-gray-800 mb-3">Ticket Information</h3>
 
-                {/* Right column */}
-                <div className="space-y-4">
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h3 className="text-base font-medium text-gray-800 mb-3">Ticket Information</h3>
-
-                    <div className="space-y-4">
-                      <div className="flex justify-between">
-                        <span className="text-sm text-gray-600">Reported By:</span>
-                        <span className="text-sm font-medium">
-                          {typeof editedData.requester === 'object'
-                            ? `${editedData.requester.name || ''} ${editedData.requester.surname || ''}`
-                            : editedData.requester}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Due Date:</span>
-                        <Input
-                          type="date"
-                          value={editedData.dueDate || ''}
-                          onChange={(e) => setEditedData(prev => ({ ...prev, dueDate: e.target.value }))}
-                          onBlur={() => editedData.dueDate !== ticket.dueDate && handleQuickUpdate('dueDate', editedData.dueDate)}
-                          className="w-36 h-8 border-gray-300"
-                        />
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Category:</span>
-                        <Select
-                          value={editedData.category || 'none'}
-                          onValueChange={(value) => handleQuickUpdate('category', value === 'none' ? null : value)}
-                        >
-                          <SelectTrigger className="w-36 h-8 border-gray-300">
-                            <SelectValue placeholder="Select category">
-                              {getCategoryName(editedData.category) || "Select category"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            {categories.map((category) => (
-                              <SelectItem key={category.id} value={category.id}>
-                                {category.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {editedData.completedAt && (
+                      <div className="space-y-4">
                         <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Completed On:</span>
+                          <span className="text-sm text-gray-600">Reported By:</span>
                           <span className="text-sm font-medium">
-                            {format(new Date(editedData.completedAt), 'dd/MM/yyyy')}
+                            {typeof editedData.requester === 'object'
+                              ? `${editedData.requester.name || ''} ${editedData.requester.surname || ''}`
+                              : editedData.requester}
                           </span>
                         </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Due Date:</span>
+                          <Input
+                            type="date"
+                            value={editedData.dueDate || ''}
+                            onChange={(e) => setEditedData(prev => ({ ...prev, dueDate: e.target.value }))}
+                            onBlur={() => editedData.dueDate !== ticket.dueDate && handleQuickUpdate('dueDate', editedData.dueDate)}
+                            className="w-36 h-8 border-gray-300"
+                          />
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600">Category:</span>
+                          <Select
+                            value={editedData.category || 'none'}
+                            onValueChange={(value) => handleQuickUpdate('category', value === 'none' ? null : value)}
+                          >
+                            <SelectTrigger className="w-36 h-8 border-gray-300">
+                              <SelectValue placeholder="Select category">
+                                {getCategoryName(editedData.category) || "Select category"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {categories.map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {editedData.completedAt && (
+                          <div className="flex justify-between">
+                            <span className="text-sm text-gray-600">Completed On:</span>
+                            <span className="text-sm font-medium">
+                              {format(new Date(editedData.completedAt), 'dd/MM/yyyy')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-[#0a1e46] p-4 rounded-lg">
+                      <h3 className="text-base font-medium text-white mb-3">Assignment</h3>
+                      <Select
+                        value={editedData.assignedTo || "unassigned"}
+                        onValueChange={(value) => handleQuickUpdate('assignedTo', value === 'unassigned' ? null : value)}
+                      >
+                        <SelectTrigger className="bg-white">
+                          <SelectValue placeholder="Assign to staff member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {staffMembers?.map((staff) => (
+                            <SelectItem key={staff.id} value={staff.id}>
+                              {staff.name} - {staff.department}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* File Summary Panel */}
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <h3 className="text-base font-medium text-gray-800 mb-3 flex items-center">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Attached Files
+                      </h3>
+                      <div className="text-sm">
+                        {attachmentCount > 0 ? (
+                          <button
+                            className="text-blue-600 hover:underline flex items-center"
+                            onClick={() => setActiveTab('files')}
+                          >
+                            <span>View all {attachmentCount} files</span>
+                          </button>
+                        ) : (
+                          <span className="text-gray-500">No files attached</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-4 flex gap-2">
+                      <Button
+                        onClick={handleSaveChanges}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        Save Changes
+                      </Button>
+
+                      {editedData.status !== 'completed' && (
+                        editedData.status === 'paused' ? (
+                          <Button
+                            onClick={() => {
+                              handleQuickUpdate('status', 'in-progress');
+                              handleQuickUpdate('pausedAt', null);
+                              handleQuickUpdate('pauseReason', null);
+
+                              // Add a system comment for resuming
+                              const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+                              push(commentsRef, {
+                                content: "Ticket resumed from pause status",
+                                user: 'System',
+                                userEmail: 'system@maintenance.app',
+                                timestamp: new Date().toISOString(),
+                                isSystemComment: true
+                              });
+
+                              toast({
+                                title: "Ticket Resumed",
+                                description: "The ticket is now back in progress",
+                                variant: "info"
+                              });
+                            }}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            Resume Ticket
+                          </Button>
+                        ) : (
+                          // Pause button
+                          <Button
+                            onClick={() => setIsPauseModalOpen(true)}
+                            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                          >
+                            Pause Ticket
+                          </Button>
+                        )
                       )}
                     </div>
-                  </div>
-
-                  <div className="bg-[#0a1e46] p-4 rounded-lg">
-                    <h3 className="text-base font-medium text-white mb-3">Assignment</h3>
-                    <Select
-                      value={editedData.assignedTo || "unassigned"}
-                      onValueChange={(value) => handleQuickUpdate('assignedTo', value === 'unassigned' ? null : value)}
-                    >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Assign to staff member" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {staffMembers?.map((staff) => (
-                          <SelectItem key={staff.id} value={staff.id}>
-                            {staff.name} - {staff.department}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* File Summary Panel */}
-                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <h3 className="text-base font-medium text-gray-800 mb-3 flex items-center">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Attached Files
-                    </h3>
-                    <div className="text-sm">
-                      {attachmentCount > 0 ? (
-                        <button
-                          className="text-blue-600 hover:underline flex items-center"
-                          onClick={() => setActiveTab('files')}
-                        >
-                          <span>View all {attachmentCount} files</span>
-                        </button>
-                      ) : (
-                        <span className="text-gray-500">No files attached</span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="pt-4 flex gap-2">
-                    <Button
-                      onClick={handleSaveChanges}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      Save Changes
-                    </Button>
-
-                    {editedData.status !== 'completed' && (
-                      editedData.status === 'paused' ? (
-                        <Button
-                          onClick={() => {
-                            handleQuickUpdate('status', 'in-progress');
-                            handleQuickUpdate('pausedAt', null);
-                            handleQuickUpdate('pauseReason', null);
-
-                            // Add a system comment for resuming
-                            const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
-                            push(commentsRef, {
-                              content: "Ticket resumed from pause status",
-                              user: 'System',
-                              userEmail: 'system@maintenance.app',
-                              timestamp: new Date().toISOString(),
-                              isSystemComment: true
-                            });
-
-                            toast({
-                              title: "Ticket Resumed",
-                              description: "The ticket is now back in progress",
-                              variant: "info"
-                            });
-                          }}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          Resume Ticket
-                        </Button>
-                      ) : (
-                        // Pause button
-                        <Button
-                          onClick={() => setIsPauseModalOpen(true)}
-                          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                        >
-                          Pause Ticket
-                        </Button>
-                      )
-                    )}
                   </div>
                 </div>
               </div>
-            </TabsContent>
+            )}
 
             {/* Comments Tab */}
-            <TabsContent value="comments" className="h-full" forceMount={activeTab === 'comments'}>
-              <TicketComments ticketId={ticket.id} />
-            </TabsContent>
+            {activeTab === 'comments' && (
+              <div className="h-full">
+                <TicketComments ticketId={ticket.id} />
+              </div>
+            )}
 
             {/* Files Tab */}
-            <TabsContent value="files" className="h-full p-4" forceMount={activeTab === 'files'}>
-              <FileAttachments ticketId={ticket.id} />
-            </TabsContent>
+            {activeTab === 'files' && (
+              <div className="h-full p-4">
+                <FileAttachments ticketId={ticket.id} />
+              </div>
+            )}
           </div>
         </Tabs>
 
@@ -556,10 +561,10 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
 
             // Send notifications to supervisor/estate manager if needed
             if (pauseData.notifySupervisor || pauseData.category === 'procurement') {
-              NotificationService.sendPauseNotification(
+              NotificationService.sendSimplePauseNotification(
                 ticket,
-                pauseData,
-                user?.uid || 'unknown-user'
+                pauseData.reason,
+                pauseData.category
               ).then(success => {
                 if (success) {
                   toast({
