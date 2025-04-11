@@ -21,13 +21,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Edit2, Save, X, MessageSquare, FileText, Calendar, Clock, MapPin, Paperclip, Loader2 } from 'lucide-react';
+import { Edit2, Save, X, MessageSquare, FileText, Calendar, Clock, MapPin, Paperclip } from 'lucide-react';
 import { TicketComments } from './TicketComments';
 import { FileAttachments } from './FileAttachments';
 import { useToast } from "@/components/ui/use-toast";
 import { format } from 'date-fns';
 import NotificationService from '../services/notificationService';
 import { useAuth } from '@/components/auth/AuthProvider';
+
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
@@ -72,7 +73,8 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
   const [isPauseModalOpen, setIsPauseModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const { user } = useAuth();
-  const [isProcessing, setIsProcessing] = useState(false);
+  // Create unique IDs for accessibility
+  const dialogDescriptionId = "ticket-details-description";
 
   useEffect(() => {
     if (ticket) {
@@ -150,20 +152,13 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
   };
 
   const handleQuickUpdate = async (field, value) => {
-    if (!ticket) return false;
-
+    if (!ticket) return;
     try {
-      // Create update object with only the necessary fields
-      const updateData = {
+      const ticketRef = ref(database, `tickets/${ticket.id}`);
+      await update(ticketRef, {
         [field]: value,
         lastUpdated: new Date().toISOString()
-      };
-
-      // Update Firebase
-      const ticketRef = ref(database, `tickets/${ticket.id}`);
-      await update(ticketRef, updateData);
-
-      // Update local state
+      });
       setEditedData(prev => ({ ...prev, [field]: value }));
 
       toast({
@@ -171,145 +166,45 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
         description: `The ticket ${field} has been updated.`,
         variant: "success"
       });
-
-      return true; // Signal success
     } catch (error) {
-      console.error(`Error updating ticket field ${field}:`, error);
+      console.error('Error updating ticket:', error);
       toast({
         title: "Update Failed",
         description: `There was an error updating the ticket.`,
         variant: "destructive"
       });
-      return false; // Signal failure
     }
   };
 
   const handleSaveChanges = async () => {
-    if (isProcessing) return;
-    setIsProcessing(true);
+    const hasChanges = Object.entries(editedData).some(([key, value]) => {
+      return ticket[key] !== value && key !== 'lastUpdated';
+    });
 
-    try {
-      const hasChanges = Object.entries(editedData).some(([key, value]) => {
-        return ticket[key] !== value && key !== 'lastUpdated';
-      });
-
-      if (hasChanges) {
-        const updates = { ...editedData, lastUpdated: new Date().toISOString() };
-        const ticketRef = ref(database, `tickets/${ticket.id}`);
-        await update(ticketRef, updates);
-
+    if (hasChanges) {
+      const updates = { ...editedData, lastUpdated: new Date().toISOString() };
+      const ticketRef = ref(database, `tickets/${ticket.id}`);
+      update(ticketRef, updates).then(() => {
         toast({
           title: "Changes Saved",
           description: "All changes have been saved successfully",
           variant: "success"
         });
-      } else {
+      }).catch(error => {
         toast({
-          title: "No Changes",
-          description: "No changes to save",
-          variant: "info"
+          title: "Error",
+          description: "Failed to save changes",
+          variant: "destructive"
         });
-      }
-    } catch (error) {
-      console.error('Error saving changes:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save changes",
-        variant: "destructive"
+        console.error('Error saving changes:', error);
       });
-    } finally {
-      setIsProcessing(false);
+    } else {
+      toast({
+        title: "No Changes",
+        description: "No changes to save",
+        variant: "info"
+      });
     }
-  };
-
-  const handlePauseTicket = (pauseData) => {
-    setIsPauseModalOpen(false);
-    setTimeout(async () => {
-      try {
-        // First, update the ticket status
-        const ticketRef = ref(database, `tickets/${ticket.id}`);
-        await update(ticketRef, {
-          status: 'paused',
-          pausedAt: new Date().toISOString(),
-          pauseReason: pauseData.reason,
-          lastUpdated: new Date().toISOString()
-        });
-        setEditedData(prev => ({
-          ...prev,
-          status: 'paused',
-          pausedAt: new Date().toISOString(),
-          pauseReason: pauseData.reason
-        }));
-
-        // Simple comment on the pause
-        const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
-        await push(commentsRef, {
-          content: `Ticket paused: ${pauseData.reason}`,
-          user: 'System',
-          timestamp: new Date().toISOString(),
-          isSystemComment: true
-        });
-
-        toast({
-          title: "Ticket Paused",
-          description: "The ticket has been paused successfully",
-          variant: "info"
-        });
-      } catch (error) {
-        console.error('Error pausing ticket:', error);
-        toast({
-          title: "Error",
-          description: "There was a problem pausing the ticket",
-          variant: "destructive"
-        });
-      }
-    }, 100); // Small delay to ensure UI updates first
-  };
-
-  const handleResumeTicket = () => {
-    // Execute in a timeout to avoid blocking the UI
-    setTimeout(async () => {
-      try {
-        // Update the ticket status
-        const ticketRef = ref(database, `tickets/${ticket.id}`);
-        await update(ticketRef, {
-          status: 'in-progress',
-          pausedAt: null,
-          pauseReason: null,
-          lastUpdated: new Date().toISOString()
-        });
-
-        // Update local state
-        setEditedData(prev => ({
-          ...prev,
-          status: 'in-progress',
-          pausedAt: null,
-          pauseReason: null
-        }));
-
-        // Add a simple comment
-        const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
-        await push(commentsRef, {
-          content: "Ticket resumed from pause status",
-          user: 'System',
-          timestamp: new Date().toISOString(),
-          isSystemComment: true
-        });
-
-        toast({
-          title: "Ticket Resumed",
-          description: "The ticket is now back in progress",
-          variant: "info"
-        });
-      } catch (error) {
-        console.error('Error resuming ticket:', error);
-        toast({
-          title: "Error",
-          description: "There was a problem resuming the ticket",
-          variant: "destructive"
-        });
-      }
-    }, 100); // Small delay to ensure UI updates first
   };
 
   if (!ticket) {
@@ -320,11 +215,11 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         className="w-full max-w-[90vw] md:max-w-4xl lg:max-w-5xl p-0 max-h-[90vh] overflow-hidden flex flex-col"
-        aria-describedby="ticket-details-description"
+        aria-describedby={dialogDescriptionId}
       >
-        <DialogHeader className="sr-only">
+        <DialogHeader>
           <DialogTitle>Ticket Details: {ticket.ticketId}</DialogTitle>
-          <DialogDescription id="ticket-details-description">
+          <DialogDescription id={dialogDescriptionId}>
             View and manage details, comments, and files for ticket {ticket.ticketId}
           </DialogDescription>
         </DialogHeader>
@@ -338,7 +233,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                 <Select
                   value={editedData.priority}
                   onValueChange={(value) => handleQuickUpdate('priority', value)}
-                  disabled={isProcessing}
                 >
                   <SelectTrigger className="border-0 bg-transparent p-0 h-8 w-auto">
                     <div className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityStyle(editedData.priority)}`}>
@@ -359,7 +253,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                 <Select
                   value={editedData.status}
                   onValueChange={(value) => handleQuickUpdate('status', value)}
-                  disabled={isProcessing}
                 >
                   <SelectTrigger className="border-0 bg-transparent p-0 h-8 w-auto">
                     <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(editedData.status)}`}>
@@ -383,7 +276,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
               size="icon"
               onClick={onClose}
               className="text-white hover:bg-blue-900/50 rounded-full"
-              disabled={isProcessing}
             >
               <X className="h-5 w-5" />
             </Button>
@@ -444,7 +336,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                       onChange={(e) => setEditedData(prev => ({ ...prev, subject: e.target.value }))}
                       onBlur={() => editedData.subject !== ticket.subject && handleQuickUpdate('subject', editedData.subject)}
                       className="border-gray-300"
-                      disabled={isProcessing}
                     />
                   </div>
                   <div className="space-y-2">
@@ -454,7 +345,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                       onChange={(e) => setEditedData(prev => ({ ...prev, description: e.target.value }))}
                       onBlur={() => editedData.description !== ticket.description && handleQuickUpdate('description', editedData.description)}
                       className="border-gray-300 min-h-[150px]"
-                      disabled={isProcessing}
                     />
                   </div>
 
@@ -463,7 +353,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                     <Select
                       value={editedData.location || 'none'}
                       onValueChange={(value) => handleQuickUpdate('location', value === 'none' ? null : value)}
-                      disabled={isProcessing}
                     >
                       <SelectTrigger className="border-gray-300">
                         <SelectValue placeholder="Select location">
@@ -505,7 +394,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                           onChange={(e) => setEditedData(prev => ({ ...prev, dueDate: e.target.value }))}
                           onBlur={() => editedData.dueDate !== ticket.dueDate && handleQuickUpdate('dueDate', editedData.dueDate)}
                           className="w-36 h-8 border-gray-300"
-                          disabled={isProcessing}
                         />
                       </div>
 
@@ -514,7 +402,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                         <Select
                           value={editedData.category || 'none'}
                           onValueChange={(value) => handleQuickUpdate('category', value === 'none' ? null : value)}
-                          disabled={isProcessing}
                         >
                           <SelectTrigger className="w-36 h-8 border-gray-300">
                             <SelectValue placeholder="Select category">
@@ -548,7 +435,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                     <Select
                       value={editedData.assignedTo || "unassigned"}
                       onValueChange={(value) => handleQuickUpdate('assignedTo', value === 'unassigned' ? null : value)}
-                      disabled={isProcessing}
                     >
                       <SelectTrigger className="bg-white">
                         <SelectValue placeholder="Assign to staff member" />
@@ -575,7 +461,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                         <button
                           className="text-blue-600 hover:underline flex items-center"
                           onClick={() => setActiveTab('files')}
-                          disabled={isProcessing}
                         >
                           <span>View all {attachmentCount} files</span>
                         </button>
@@ -589,27 +474,40 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                     <Button
                       onClick={handleSaveChanges}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                      disabled={isProcessing}
                     >
-                      {isProcessing ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        'Save Changes'
-                      )}
+                      Save Changes
                     </Button>
 
                     {editedData.status !== 'completed' && (
                       editedData.status === 'paused' ? (
                         <Button
-                          onClick={handleResumeTicket}
+                          onClick={() => {
+                            handleQuickUpdate('status', 'in-progress');
+                            handleQuickUpdate('pausedAt', null);
+                            handleQuickUpdate('pauseReason', null);
+
+                            // Add a system comment for resuming
+                            const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+                            push(commentsRef, {
+                              content: "Ticket resumed from pause status",
+                              user: 'System',
+                              userEmail: 'system@maintenance.app',
+                              timestamp: new Date().toISOString(),
+                              isSystemComment: true
+                            });
+
+                            toast({
+                              title: "Ticket Resumed",
+                              description: "The ticket is now back in progress",
+                              variant: "info"
+                            });
+                          }}
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                         >
                           Resume Ticket
                         </Button>
                       ) : (
+                        // Pause button
                         <Button
                           onClick={() => setIsPauseModalOpen(true)}
                           className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
@@ -639,10 +537,49 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
         <PauseReasonModal
           open={isPauseModalOpen}
           onOpenChange={setIsPauseModalOpen}
-          onPause={handlePauseTicket}
+          onPause={(pauseData) => {
+            // Set status to paused
+            handleQuickUpdate('status', 'paused');
+            handleQuickUpdate('pausedAt', new Date().toISOString());
+            handleQuickUpdate('pauseReason', pauseData.reason);
+            handleQuickUpdate('pauseData', pauseData);
+
+            // Add a comment about the pause
+            const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+            push(commentsRef, {
+              content: `Ticket paused: ${pauseData.reason}${pauseData.estimatedDuration ? ` - Estimated duration: ${pauseData.estimatedDuration.replace('_', ' ')}` : ''}`,
+              user: 'System',
+              userEmail: 'system@maintenance.app',
+              timestamp: new Date().toISOString(),
+              isSystemComment: true
+            });
+
+            // Send notifications to supervisor/estate manager if needed
+            if (pauseData.notifySupervisor || pauseData.category === 'procurement') {
+              NotificationService.sendPauseNotification(
+                ticket,
+                pauseData,
+                user?.uid || 'unknown-user'
+              ).then(success => {
+                if (success) {
+                  toast({
+                    title: "Notifications Sent",
+                    description: `Supervisor${pauseData.category === 'procurement' ? ' and Estate Manager' : ''} have been notified`,
+                    variant: "info"
+                  });
+                }
+              });
+            }
+
+            toast({
+              title: "Ticket Paused",
+              description: "The ticket has been put on hold",
+              variant: "info"
+            });
+          }}
         />
-      </DialogContent >
-    </Dialog >
+      </DialogContent>
+    </Dialog>
   );
 };
 
