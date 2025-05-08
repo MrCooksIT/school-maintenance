@@ -116,10 +116,11 @@ const RootLayout = () => {
 
     return (
         <div className="flex h-screen bg-gray-50">
+            {/* Sidebar */}
             <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
 
-            {/* Fixed: Main content doesn't resize with sidebar */}
-            <div className="flex-1 ml-0 flex flex-col">
+            {/* Main content - adjusts based on sidebar state */}
+            <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
                 <Header toggleSidebar={toggleSidebar} userRole={userRole} signOut={signOut} />
                 <main className="flex-1 mt-16 p-4 overflow-auto">
                     <Outlet />
