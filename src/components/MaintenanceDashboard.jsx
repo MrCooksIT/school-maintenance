@@ -1,11 +1,12 @@
-// src/components/MaintenanceDashboard.jsx
+// src/components/MaintenanceDashboard.jsx - Fixed version
+// Look for any Select.Item components with empty string values and fix them
+
 import React, { useState, useEffect } from 'react';
-import { ref, onValue, update } from 'firebase/database';
+import { ref, onValue } from 'firebase/database';
 import { database } from '@/config/firebase';
 import TicketDetailsModal from './tickets/TicketDetailsModal';
 import { DateRangePicker } from './DateRangePicker';
 import { format } from 'date-fns';
-import { processTicketCategories } from '@/components/utils/categoryHelpers';
 import {
   Filter,
   MessageSquare,
@@ -143,7 +144,6 @@ const MaintenanceDashboard = () => {
     assignee: ''
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [processedCategories, setProcessedCategories] = useState({});
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -203,31 +203,6 @@ const MaintenanceDashboard = () => {
 
     return () => unsubscribe();
   }, []);
-
-  // Process tickets to auto-create categories
-  useEffect(() => {
-    // Skip if no tickets
-    if (!tickets.length) return;
-    
-    const processCategoriesAsync = async () => {
-      try {
-        // Process new categories from tickets
-        const updatedProcessed = await processTicketCategories(
-          database, 
-          tickets, 
-          processedCategories,
-          toast // Pass the toast function for notifications
-        );
-        
-        // Update processed categories tracker
-        setProcessedCategories(updatedProcessed);
-      } catch (error) {
-        console.error("Error processing categories:", error);
-      }
-    };
-
-    processCategoriesAsync();
-  }, [tickets, processedCategories, toast]);
 
   useEffect(() => {
     // Load staff members
@@ -358,7 +333,8 @@ const MaintenanceDashboard = () => {
                         <SelectValue placeholder="Any priority" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Any priority</SelectItem>
+                        {/* FIX: Use a non-empty string value for the "Any" option */}
+                        <SelectItem value="any">Any priority</SelectItem>
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
                         <SelectItem value="low">Low</SelectItem>
@@ -385,7 +361,8 @@ const MaintenanceDashboard = () => {
                         <SelectValue placeholder="Any staff member" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Any staff member</SelectItem>
+                        {/* FIX: Use non-empty string values for all options */}
+                        <SelectItem value="any">Any staff member</SelectItem>
                         <SelectItem value="unassigned">Unassigned</SelectItem>
                         {staffMembers.map(staff => (
                           <SelectItem key={staff.id} value={staff.id}>
