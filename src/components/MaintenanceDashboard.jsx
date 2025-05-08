@@ -1,6 +1,4 @@
-// src/components/MaintenanceDashboard.jsx - Fixed version
-// Look for any Select.Item components with empty string values and fix them
-
+// src/components/MaintenanceDashboard.jsx - Fixed for persistent closed tickets
 import React, { useState, useEffect } from 'react';
 import { ref, onValue } from 'firebase/database';
 import { database } from '@/config/firebase';
@@ -39,7 +37,8 @@ const StatusBadge = ({ status }) => {
     "in-progress": "bg-yellow-100 text-yellow-800 border-yellow-200",
     "paused": "bg-purple-100 text-purple-800 border-purple-200",
     completed: "bg-green-100 text-green-800 border-green-200",
-    overdue: "bg-red-100 text-red-800 border-red-200"
+    overdue: "bg-red-100 text-red-800 border-red-200",
+    deleted: "bg-gray-100 text-gray-800 border-gray-200"
   };
 
   const getDisplayText = (status) => {
@@ -51,7 +50,7 @@ const StatusBadge = ({ status }) => {
   };
 
   return (
-    <Badge className={`${statusStyles[status]} text-xs uppercase`}>
+    <Badge className={`${statusStyles[status] || "bg-gray-100 text-gray-800"} text-xs uppercase`}>
       {getDisplayText(status)}
     </Badge>
   );
@@ -66,7 +65,7 @@ const PriorityBadge = ({ priority }) => {
   };
 
   return (
-    <Badge className={`${priorityStyles[priority]} text-xs uppercase`}>
+    <Badge className={`${priorityStyles[priority] || "bg-gray-100 text-gray-800"} text-xs uppercase`}>
       {priority}
     </Badge>
   );
@@ -105,9 +104,7 @@ const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
         )}
       </td>
       <td className="px-4 py-3 text-sm">
-        {ticket.completedAt ? (new Date(ticket.createdAt).toLocaleString('en-GB')) : (
-          '-'
-        )}
+        {ticket.completedAt ? format(new Date(ticket.completedAt), 'dd/MM/yyyy') : '-'}
       </td>
       <td className="px-4 py-3 text-right">
         <Button
@@ -139,9 +136,9 @@ const MaintenanceDashboard = () => {
     to: new Date()
   });
   const [advancedFilters, setAdvancedFilters] = useState({
-    priority: '',
+    priority: 'any',
     location: '',
-    assignee: ''
+    assignee: 'any'
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
@@ -177,9 +174,9 @@ const MaintenanceDashboard = () => {
   const clearFilters = () => {
     setSearchQuery('');
     setAdvancedFilters({
-      priority: '',
+      priority: 'any',
       location: '',
-      assignee: ''
+      assignee: 'any'
     });
     setDateRange({
       from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
@@ -197,7 +194,14 @@ const MaintenanceDashboard = () => {
             ...value
           }))
           .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        // Log ticket data for debugging
+        console.log('Fetched tickets:', ticketsData.length);
+        console.log('Completed tickets:', ticketsData.filter(t => t.status === 'completed').length);
+
         setTickets(ticketsData);
+      } else {
+        setTickets([]);
       }
     });
 
@@ -221,30 +225,45 @@ const MaintenanceDashboard = () => {
   }, []);
 
   const filteredTickets = tickets.filter(ticket => {
+    // Don't show deleted tickets
+    if (ticket.status === 'deleted' || ticket.isDeleted === true) {
+      return false;
+    }
+
     // Status filter (open/closed)
     const statusMatch = filterStatus === 'open'
       ? ticket.status !== 'completed'
       : ticket.status === 'completed';
 
+    // Skip remaining filters if status doesn't match
+    if (!statusMatch) return false;
+
     // Search query
     const searchMatch = searchQuery
-      ? Object.values(ticket).some(value =>
-        String(value).toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      ? Object.values(ticket).some(value => {
+        if (value === null || value === undefined) return false;
+        return String(value).toLowerCase().includes(searchQuery.toLowerCase());
+      })
       : true;
 
-    // Date range
+    // Date range - check creation date
     const ticketDate = new Date(ticket.createdAt);
     const dateMatch = (!dateRange.from || ticketDate >= dateRange.from) &&
       (!dateRange.to || ticketDate <= dateRange.to);
 
     // Advanced filters
-    const priorityMatch = !advancedFilters.priority || ticket.priority === advancedFilters.priority;
-    const locationMatch = !advancedFilters.location ||
-      (ticket.location && ticket.location.toLowerCase().includes(advancedFilters.location.toLowerCase()));
-    const assigneeMatch = !advancedFilters.assignee || ticket.assignedTo === advancedFilters.assignee;
+    const priorityMatch = !advancedFilters.priority ||
+      advancedFilters.priority === 'any' ||
+      ticket.priority === advancedFilters.priority;
 
-    return statusMatch && searchMatch && dateMatch && priorityMatch && locationMatch && assigneeMatch;
+    const locationMatch = !advancedFilters.location ||
+      (ticket.location && String(ticket.location).toLowerCase().includes(advancedFilters.location.toLowerCase()));
+
+    const assigneeMatch = !advancedFilters.assignee ||
+      advancedFilters.assignee === 'any' ||
+      (advancedFilters.assignee === 'unassigned' ? !ticket.assignedTo : ticket.assignedTo === advancedFilters.assignee);
+
+    return searchMatch && dateMatch && priorityMatch && locationMatch && assigneeMatch;
   });
 
   const handleTicketClick = (ticket) => {
@@ -314,7 +333,7 @@ const MaintenanceDashboard = () => {
                 >
                   <Sliders className="h-4 w-4 mr-2" />
                   Advanced Filters
-                  {(advancedFilters.priority || advancedFilters.location || advancedFilters.assignee) && (
+                  {(advancedFilters.priority !== 'any' || advancedFilters.location || advancedFilters.assignee !== 'any') && (
                     <span className="absolute top-0 right-0 -mt-1 -mr-1 h-3 w-3 rounded-full bg-blue-500"></span>
                   )}
                 </Button>
@@ -333,7 +352,6 @@ const MaintenanceDashboard = () => {
                         <SelectValue placeholder="Any priority" />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* FIX: Use a non-empty string value for the "Any" option */}
                         <SelectItem value="any">Any priority</SelectItem>
                         <SelectItem value="high">High</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
@@ -361,7 +379,6 @@ const MaintenanceDashboard = () => {
                         <SelectValue placeholder="Any staff member" />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* FIX: Use non-empty string values for all options */}
                         <SelectItem value="any">Any staff member</SelectItem>
                         <SelectItem value="unassigned">Unassigned</SelectItem>
                         {staffMembers.map(staff => (
@@ -403,12 +420,14 @@ const MaintenanceDashboard = () => {
       {/* Tickets count and filters bar */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">Tickets</h2>
+          <h2 className="text-lg font-semibold">
+            {filterStatus === 'open' ? 'Open Tickets' : 'Closed Tickets'}
+          </h2>
           <Badge variant="secondary">{filteredTickets.length}</Badge>
         </div>
 
         {/* Clear filters button - only shown when filters are active */}
-        {(searchQuery || advancedFilters.priority || advancedFilters.location || advancedFilters.assignee) && (
+        {(searchQuery || advancedFilters.priority !== 'any' || advancedFilters.location || advancedFilters.assignee !== 'any') && (
           <Button
             variant="ghost"
             size="sm"
@@ -433,7 +452,9 @@ const MaintenanceDashboard = () => {
                 <th className="px-4 py-3 text-sm font-medium text-gray-500">Title</th>
                 <th className="px-4 py-3 text-sm font-medium text-gray-500">Priority</th>
                 <th className="px-4 py-3 text-sm font-medium text-gray-500">Assigned To</th>
-                <th className="px-4 py-3 text-sm font-medium text-gray-500">Completed</th>
+                <th className="px-4 py-3 text-sm font-medium text-gray-500">
+                  {filterStatus === 'closed' ? 'Completed On' : 'Completed'}
+                </th>
                 <th className="px-4 py-3 text-sm font-medium text-gray-500 text-right">Actions</th>
               </tr>
             </thead>
@@ -450,7 +471,9 @@ const MaintenanceDashboard = () => {
               ) : (
                 <tr>
                   <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
-                    No tickets found matching your criteria
+                    {filterStatus === 'open'
+                      ? 'No open tickets found matching your criteria'
+                      : 'No closed tickets found matching your criteria'}
                   </td>
                 </tr>
               )}

@@ -154,11 +154,35 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
     if (!ticket) return;
     try {
       const ticketRef = ref(database, `tickets/${ticket.id}`);
-      await update(ticketRef, {
+
+      // Create the update object
+      const updates = {
         [field]: value,
         lastUpdated: new Date().toISOString()
-      });
-      setEditedData(prev => ({ ...prev, [field]: value }));
+      };
+
+      // If we're setting status to completed, add the completion timestamp
+      if (field === 'status' && value === 'completed') {
+        updates.completedAt = new Date().toISOString();
+
+        // Also add to status history
+        const historyRef = ref(database, `tickets/${ticket.id}/statusHistory`);
+        push(historyRef, {
+          status: 'completed',
+          timestamp: new Date().toISOString(),
+          by: user?.uid || 'unknown' // if you have current user context
+        });
+      }
+
+      // Update the ticket
+      await update(ticketRef, updates);
+
+      // Update local state
+      setEditedData(prev => ({
+        ...prev,
+        [field]: value,
+        ...(field === 'status' && value === 'completed' ? { completedAt: new Date().toISOString() } : {})
+      }));
 
       toast({
         title: "Update Successful",
