@@ -3,17 +3,21 @@ import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 
-export function AdminRoute({ children }) {
+export function AdminRoute({ children, isFullAdminOnly = false }) {
     const { user, userRole, loading } = useAuth();
     const location = useLocation();
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [isAuthorized, setIsAuthorized] = useState(false);
 
     useEffect(() => {
-        // Check if user has admin role
-        if (userRole === 'admin' || userRole === 'supervisor') {
-            setIsAdmin(true);
+        // Check if user has appropriate admin role
+        if (isFullAdminOnly) {
+            // Only full admins can access if isFullAdminOnly is true
+            setIsAuthorized(userRole === 'admin');
+        } else {
+            // Both admins and supervisors can access
+            setIsAuthorized(userRole === 'admin' || userRole === 'supervisor');
         }
-    }, [user, userRole]);
+    }, [user, userRole, isFullAdminOnly]);
 
     if (loading) {
         return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -24,8 +28,8 @@ export function AdminRoute({ children }) {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    if (!isAdmin) {
-        // Redirect to dashboard if authenticated but not admin
+    if (!isAuthorized) {
+        // Redirect to dashboard if authenticated but not authorized
         return <Navigate to="/" state={{ from: location }} replace />;
     }
 

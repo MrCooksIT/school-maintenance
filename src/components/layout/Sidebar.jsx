@@ -15,7 +15,8 @@ import {
     ChevronDown,
     ChevronRight,
     Shield,
-    Wrench
+    Wrench,
+    UserCog
 } from 'lucide-react';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
@@ -25,6 +26,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
     const isActiveRoute = (path) => location.pathname === path;
     const isAdmin = userRole === 'admin' || userRole === 'supervisor';
+    const isFullAdmin = userRole === 'admin';
 
     // General routes accessible to all authenticated users
     const generalRoutes = [
@@ -40,6 +42,11 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Locations', icon: <MapPin className="h-5 w-5" />, path: '/admin/locations' },
         { name: 'Categories', icon: <FolderOpen className="h-5 w-5" />, path: '/admin/categories' },
         { name: 'Team', icon: <Users className="h-5 w-5" />, path: '/admin/team' },
+    ];
+
+    // Full admin only routes
+    const fullAdminRoutes = [
+        { name: 'Role Manager', icon: <UserCog className="h-5 w-5" />, path: '/admin/roles' }
     ];
 
     const toggleAdminSection = () => {
@@ -104,6 +111,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         {/* Admin Submenu - Only visible when expanded */}
                         {adminExpanded && (
                             <div className="ml-4 pl-2 border-l border-blue-800">
+                                {/* Regular admin routes */}
                                 {adminRoutes.map((item) => (
                                     <Link
                                         key={item.path}
@@ -117,6 +125,24 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                         {item.name}
                                     </Link>
                                 ))}
+
+                                {/* Full admin only routes */}
+                                {isFullAdmin && fullAdminRoutes.map((item) => (
+                                    <Link
+                                        key={item.path}
+                                        to={item.path}
+                                        className={`flex items-center gap-3 px-4 py-2 mt-1 rounded-lg text-sm ${isActiveRoute(item.path)
+                                            ? 'bg-blue-600 text-white'
+                                            : 'text-gray-300 hover:bg-blue-700/50'
+                                            }`}
+                                    >
+                                        {item.icon}
+                                        <div className="flex items-center">
+                                            {item.name}
+                                            <span className="ml-1 px-1 py-0.5 bg-yellow-500 text-black rounded text-xs">Admin</span>
+                                        </div>
+                                    </Link>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -126,10 +152,13 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             <div className="p-4 border-t border-blue-900">
                 <div className="flex items-center px-4 py-2">
                     <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold mr-3">
-                        {userRole === 'admin' ? 'A' : 'S'}
+                        {userRole === 'admin' ? 'A' : userRole === 'supervisor' ? 'S' : 'U'}
                     </div>
                     <div>
-                        <p className="text-white text-sm">{userRole === 'admin' ? 'Admin' : 'Staff'}</p>
+                        <p className="text-white text-sm">
+                            {userRole === 'admin' ? 'Admin' :
+                                userRole === 'supervisor' ? 'Supervisor' : 'Staff'}
+                        </p>
                         <p className="text-gray-400 text-xs">Role: {userRole}</p>
                     </div>
                 </div>

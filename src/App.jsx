@@ -14,6 +14,7 @@ import Calendar from './components/admin/Calendar';
 import Workload from './components/admin/Workload';
 import Locations from './components/admin/Locations';
 import CategoriesPage from './components/admin/CategoriesPage';
+import AdminRoleManager from './components/admin/AdminRoleManager';
 
 function App() {
   return (
@@ -73,6 +74,13 @@ function App() {
             <Route path="admin/locations" element={
               <AdminRoute>
                 <Locations />
+              </AdminRoute>
+            } />
+
+            {/* New Admin Role Management Route - Only visible to full admins */}
+            <Route path="admin/roles" element={
+              <AdminRoute isFullAdminOnly={true}>
+                <AdminRoleManager />
               </AdminRoute>
             } />
 
