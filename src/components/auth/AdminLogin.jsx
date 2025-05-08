@@ -2,26 +2,20 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Lock, User, Shield } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
 
 const AdminLogin = () => {
     const { signIn, userRole } = useAuth();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
     const navigate = useNavigate();
     const location = useLocation();
-    const { toast } = useToast();
 
     // Get the page they were trying to access
     const from = location.state?.from?.pathname || '/';
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
+    const handleLogin = async () => {
         setIsLoading(true);
+        setError('');
 
         try {
             // Use the regular signIn method
@@ -30,26 +24,13 @@ const AdminLogin = () => {
             // Redirect based on role
             if (userRole === 'admin' || userRole === 'supervisor') {
                 navigate(from);
-                toast({
-                    title: "Admin Login Successful",
-                    description: "Welcome to the admin panel",
-                    variant: "success",
-                });
             } else {
-                toast({
-                    title: "Access Denied",
-                    description: "You don't have admin permissions",
-                    variant: "destructive",
-                });
+                setError("You don't have admin permissions");
                 navigate('/');
             }
         } catch (error) {
             console.error('Login failed:', error);
-            toast({
-                title: "Login Failed",
-                description: error.message || "Authentication failed",
-                variant: "destructive",
-            });
+            setError(error.message || "Authentication failed");
         } finally {
             setIsLoading(false);
         }
@@ -60,7 +41,9 @@ const AdminLogin = () => {
             <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
                 <div className="text-center">
                     <div className="mx-auto h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
-                        <Shield className="h-10 w-10 text-blue-600" />
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.618 5.984A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016zM12 9v2m0 4h.01" />
+                        </svg>
                     </div>
                     <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Admin Access</h2>
                     <p className="mt-2 text-sm text-gray-600">
@@ -68,66 +51,28 @@ const AdminLogin = () => {
                     </p>
                 </div>
 
-                <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-                    <div className="rounded-md shadow-sm space-y-4">
-                        <div className="relative">
-                            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                            <Input
-                                id="email-address"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                className="pl-10"
-                                placeholder="Email address"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                            <Input
-                                id="password"
-                                name="password"
-                                type="password"
-                                autoComplete="current-password"
-                                required
-                                className="pl-10"
-                                placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                        </div>
+                {error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                        {error}
                     </div>
+                )}
 
-                    <Button
-                        type="submit"
-                        className="w-full bg-blue-600 hover:bg-blue-700"
+                <div className="flex flex-col gap-4">
+                    <button
+                        onClick={handleLogin}
                         disabled={isLoading}
+                        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                     >
-                        {isLoading ? (
-                            <span className="flex items-center justify-center">
-                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Signing in...
-                            </span>
-                        ) : (
-                            <span>Sign in</span>
-                        )}
-                    </Button>
+                        {isLoading ? 'Signing in...' : 'Sign in with Google'}
+                    </button>
 
-                    <div className="text-center mt-4">
-                        <Button
-                            variant="link"
-                            className="text-sm text-blue-600 hover:text-blue-800"
-                            onClick={() => navigate('/')}
-                        >
-                            Return to Dashboard
-                        </Button>
-                    </div>
-                </form>
+                    <button
+                        onClick={() => navigate('/')}
+                        className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                        Return to Dashboard
+                    </button>
+                </div>
             </div>
         </div>
     );

@@ -12,7 +12,9 @@ import {
     X
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
+
+// Fix the imports by using the absolute path with @/
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -20,7 +22,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
+} from '@/components/ui/dropdown-menu';
 
 // Header Component
 const Header = ({ toggleSidebar, userRole, signOut }) => {
