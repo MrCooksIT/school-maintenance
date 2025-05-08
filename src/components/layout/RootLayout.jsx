@@ -1,28 +1,42 @@
 // src/components/layout/RootLayout.jsx
 import React, { useState } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import Sidebar from './Sidebar';
 import {
-    Bell,
     UserCircle,
     LogOut,
     Shield,
-    Menu,
-    X
+    Menu
 } from 'lucide-react';
-import NotificationBell from '../NotificationBell';
-import { Button } from '@/components/ui/button';
+import SimpleDropdown, {
+    SimpleDropdownItem,
+    SimpleDropdownDivider,
+    SimpleDropdownLabel
+} from '../ui/SimpleDropdown';
 
-// Fix the imports by using the absolute path with @/
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+// Simple Button Component
+const SimpleButton = ({ children, onClick, className = "", variant = "default" }) => {
+    const getButtonClass = () => {
+        switch (variant) {
+            case "ghost":
+                return "bg-transparent hover:bg-gray-100 text-gray-700";
+            case "icon":
+                return "p-2 rounded-full";
+            default:
+                return "bg-blue-600 hover:bg-blue-700 text-white";
+        }
+    };
+
+    return (
+        <button
+            onClick={onClick}
+            className={`rounded-md font-medium focus:outline-none ${getButtonClass()} ${className}`}
+        >
+            {children}
+        </button>
+    );
+};
 
 // Header Component
 const Header = ({ toggleSidebar, userRole, signOut }) => {
@@ -32,14 +46,13 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
     return (
         <div className="bg-[#0a1e46] text-white h-16 flex items-center justify-between px-6 shadow-lg fixed top-0 right-0 left-0 z-40">
             {/* Sidebar toggle button */}
-            <Button
+            <SimpleButton
                 variant="ghost"
-                size="icon"
                 onClick={toggleSidebar}
-                className="text-white hover:bg-blue-900/50"
+                className="text-white hover:bg-blue-900/50 p-2 rounded-full"
             >
                 <Menu className="h-5 w-5" />
-            </Button>
+            </SimpleButton>
 
             {/* Centered logo and title */}
             <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4">
@@ -51,41 +64,43 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
 
             {/* Icons on the right */}
             <div className="flex items-center gap-4">
-                <NotificationBell userRole={userRole} />
-
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="text-white hover:bg-blue-900/50">
-                            <UserCircle className="h-6 w-6" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
-
-                        <DropdownMenuSeparator />
-
-                        {isAdmin && (
-                            <>
-                                <DropdownMenuItem
-                                    className="flex items-center gap-2 cursor-pointer"
-                                    onClick={() => navigate('/admin/team')}
-                                >
-                                    <Shield className="h-4 w-4" />
-                                    <span>Admin Panel</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                            </>
-                        )}
-
-                        <DropdownMenuItem
-                            className="flex items-center gap-2 text-red-600 cursor-pointer"
-                            onClick={signOut}
+                {/* User Menu Dropdown */}
+                <SimpleDropdown
+                    trigger={
+                        <SimpleButton
+                            variant="ghost"
+                            className="text-white hover:bg-blue-900/50 p-2 rounded-full"
                         >
-                            <LogOut className="h-4 w-4" />
-                            <span>Sign out</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                            <UserCircle className="h-6 w-6" />
+                        </SimpleButton>
+                    }
+                    align="right"
+                >
+                    <SimpleDropdownLabel>My Account</SimpleDropdownLabel>
+
+                    <SimpleDropdownDivider />
+
+                    {isAdmin && (
+                        <>
+                            <SimpleDropdownItem
+                                onClick={() => navigate('/admin/team')}
+                                className="flex items-center gap-2"
+                            >
+                                <Shield className="h-4 w-4" />
+                                <span>Admin Panel</span>
+                            </SimpleDropdownItem>
+                            <SimpleDropdownDivider />
+                        </>
+                    )}
+
+                    <SimpleDropdownItem
+                        onClick={signOut}
+                        className="flex items-center gap-2 text-red-600"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        <span>Sign out</span>
+                    </SimpleDropdownItem>
+                </SimpleDropdown>
             </div>
         </div>
     );
@@ -94,7 +109,6 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
 const RootLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { userRole, signOut } = useAuth();
-    const location = useLocation();
 
     const toggleSidebar = () => {
         setIsSidebarOpen((prev) => !prev);
