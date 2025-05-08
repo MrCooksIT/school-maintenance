@@ -1,6 +1,7 @@
 // src/components/auth/AuthProvider.jsx
 import { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '../../config/firebase';
+import { auth, database } from '../../config/firebase';
+import { ref, get } from 'firebase/database';
 import {
     signInWithPopup,
     GoogleAuthProvider,
@@ -14,10 +15,47 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
     const [userRole, setUserRole] = useState(null);
 
+    // Function to fetch user role from the database
+    const fetchUserRole = async (userId) => {
+        try {
+            // First check if user is in admin collection
+            const adminRef = ref(database, `admins/${userId}`);
+            const adminSnapshot = await get(adminRef);
+
+            if (adminSnapshot.exists()) {
+                // User is an admin
+                return adminSnapshot.val().role || 'admin';
+            }
+
+            // Then check staff collection
+            const staffRef = ref(database, `staff/${userId}`);
+            const staffSnapshot = await get(staffRef);
+
+            if (staffSnapshot.exists()) {
+                // User is staff, check if they have a role
+                return staffSnapshot.val().role || 'staff';
+            }
+
+            // Default role
+            return 'staff';
+        } catch (error) {
+            console.error("Error fetching user role:", error);
+            return 'staff'; // Default to staff on error
+        }
+    };
+
     useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged((user) => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
             setUser(user);
-            // In a real app, you'd fetch the user's role from Firestore here
+
+            if (user) {
+                // Fetch user role when authenticated
+                const role = await fetchUserRole(user.uid);
+                setUserRole(role);
+            } else {
+                setUserRole(null);
+            }
+
             setLoading(false);
         });
 
@@ -28,6 +66,11 @@ export function AuthProvider({ children }) {
         const provider = new GoogleAuthProvider();
         try {
             const result = await signInWithPopup(auth, provider);
+
+            // After successful sign-in, get the user role
+            const role = await fetchUserRole(result.user.uid);
+            setUserRole(role);
+
             return result.user;
         } catch (error) {
             console.error("Auth Error:", error);
@@ -35,7 +78,16 @@ export function AuthProvider({ children }) {
         }
     };
 
-    const signOut = () => firebaseSignOut(auth);
+    const signOut = () => {
+        return firebaseSignOut(auth).then(() => {
+            setUserRole(null);
+        });
+    };
+
+    // Check if user has admin privileges
+    const isAdmin = () => {
+        return userRole === 'admin' || userRole === 'supervisor';
+    };
 
     const value = {
         user,
@@ -43,6 +95,7 @@ export function AuthProvider({ children }) {
         signIn,
         signOut,
         userRole,
+        isAdmin,
     };
 
     return (

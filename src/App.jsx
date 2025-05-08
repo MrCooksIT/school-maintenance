@@ -1,9 +1,11 @@
 // App.jsx
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './components/auth/AuthProvider';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import Login from './components/auth/Login';
+import AdminLogin from './components/auth/AdminLogin';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { AdminRoute } from './components/auth/AdminRoute';
 import RootLayout from './components/layout/RootLayout';
 import Team from './components/admin/Team';
 import Jobs from './components/admin/Jobs';
@@ -12,89 +14,97 @@ import Calendar from './components/admin/Calendar';
 import Workload from './components/admin/Workload';
 import Locations from './components/admin/Locations';
 import CategoriesPage from './components/admin/CategoriesPage';
-import { Toaster } from "@/components/Toaster"
+import { Toaster } from "@/components/ui/toast";
+
 function App() {
   return (
     <>
       <Router basename="/school-maintenance">
         <AuthProvider>
-          <RootLayout>
-            <div className="min-h-screen bg-gray-50">
-              <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route
-                  path="/"
-                  element={
-                    <ProtectedRoute>
-                      <MaintenanceDashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/team"
-                  element={
-                    <ProtectedRoute>
-                      <Team />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/jobs"
-                  element={
-                    <ProtectedRoute>
-                      <Jobs />
-                    </ProtectedRoute>
-                  }
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
 
-                />
-                <Route
-                  path="/admin/analytics"
-                  element={
-                    <ProtectedRoute>
-                      <Analytics />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route 
-                path="admin/categories"
-                element={<ProtectedRoute>
-                  <CategoriesPage />
-                </ProtectedRoute> 
+            {/* Protected Routes inside Layout */}
+            <Route element={<RootLayout />}>
+              {/* Regular User Routes */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <MaintenanceDashboard />
+                  </ProtectedRoute>
                 }
-                />
+              />
+              <Route
+                path="/admin/jobs"
+                element={
+                  <ProtectedRoute>
+                    <Jobs />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/calendar"
+                element={
+                  <ProtectedRoute>
+                    <Calendar />
+                  </ProtectedRoute>
+                }
+              />
 
-                <Route
-                  path="/admin/calendar"
-                  element={
-                    <ProtectedRoute>
-                      <Calendar />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/workload"
-                  element={
-                    <ProtectedRoute>
-                      <Workload />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/locations"
-                  element={
-                    <ProtectedRoute>
-                      <Locations />
-                    </ProtectedRoute>
-                  }
-                />
-              </Routes>
-            </div>
-          </RootLayout>
+              {/* Admin Only Routes */}
+              <Route
+                path="/admin/team"
+                element={
+                  <AdminRoute>
+                    <Team />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/admin/analytics"
+                element={
+                  <AdminRoute>
+                    <Analytics />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/admin/categories"
+                element={
+                  <AdminRoute>
+                    <CategoriesPage />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/admin/workload"
+                element={
+                  <AdminRoute>
+                    <Workload />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/admin/locations"
+                element={
+                  <AdminRoute>
+                    <Locations />
+                  </AdminRoute>
+                }
+              />
+
+              {/* Catch-all redirect */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+
+          <Toaster />
         </AuthProvider>
       </Router>
-      <Toaster />
     </>
-
   );
 }
 
