@@ -1,4 +1,4 @@
-// App.jsx with restored authentication checks
+// App.jsx with fully simplified routing structure
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './components/auth/AuthProvider';
@@ -6,7 +6,6 @@ import MaintenanceDashboard from './components/MaintenanceDashboard';
 import Login from './components/auth/Login';
 import AdminLogin from './components/auth/AdminLogin';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { AdminRoute } from './components/auth/AdminRoute';
 import RootLayout from './components/layout/RootLayout';
 import Team from './components/admin/Team';
 import Jobs from './components/admin/Jobs';
@@ -23,12 +22,12 @@ function App() {
     <Router basename="/school-maintenance">
       <AuthProvider>
         <Routes>
-          {/* Login route - outside main layout */}
+          {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<AdminLogin />} />
 
-          {/* Root layout routes - ALL protected with ProtectedRoute */}
-          <Route path="/" element={
+          {/* Protected routes layout */}
+          <Route element={
             <ProtectedRoute>
               <RootLayout />
             </ProtectedRoute>
@@ -36,43 +35,17 @@ function App() {
             {/* Dashboard */}
             <Route index element={<MaintenanceDashboard />} />
 
-            {/* Regular user routes */}
+            {/* All admin routes - access control is handled by the sidebar visibility */}
             <Route path="admin/jobs" element={<Jobs />} />
             <Route path="admin/calendar" element={<Calendar />} />
+            <Route path="admin/analytics" element={<Analytics />} />
+            <Route path="admin/workload" element={<Workload />} />
+            <Route path="admin/locations" element={<Locations />} />
+            <Route path="admin/categories" element={<CategoriesPage />} />
+            <Route path="admin/team" element={<Team />} />
+            <Route path="admin/roles" element={<AdminRoleManager />} />
 
-            {/* Admin routes - protected with AdminRoute */}
-            <Route path="admin/analytics" element={
-              <AdminRoute>
-                <Analytics />
-              </AdminRoute>
-            } />
-            <Route path="admin/workload" element={
-              <AdminRoute>
-                <Workload />
-              </AdminRoute>
-            } />
-            <Route path="admin/locations" element={
-              <AdminRoute>
-                <Locations />
-              </AdminRoute>
-            } />
-            <Route path="admin/categories" element={
-              <AdminRoute>
-                <CategoriesPage />
-              </AdminRoute>
-            } />
-            <Route path="admin/team" element={
-              <AdminRoute>
-                <Team />
-              </AdminRoute>
-            } />
-            <Route path="admin/roles" element={
-              <AdminRoute isFullAdminOnly={true}>
-                <AdminRoleManager />
-              </AdminRoute>
-            } />
-
-            {/* Fallback for any other route */}
+            {/* Fallback */}
             <Route path="*" element={<PageNotFound />} />
           </Route>
         </Routes>

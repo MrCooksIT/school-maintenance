@@ -1,7 +1,8 @@
-// src/components/auth/AuthProvider.jsx
+// src/components/auth/AuthProvider.jsx with role-based navigation guard
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth, database } from '../../config/firebase';
 import { ref, get, set, update, onValue } from 'firebase/database';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     signInWithPopup,
     GoogleAuthProvider,
@@ -10,12 +11,64 @@ import {
 
 const AuthContext = createContext({});
 
+// List of admin-only routes
+const ADMIN_ROUTES = [
+    '/admin/analytics',
+    '/admin/workload',
+    '/admin/locations',
+    '/admin/categories',
+    '/admin/team'
+];
+
+// List of full-admin-only routes
+const FULL_ADMIN_ROUTES = [
+    '/admin/roles'
+];
+
 const DEFAULT_ADMIN_EMAIL = 'acoetzee@maristsj.co.za';
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [userRole, setUserRole] = useState(null);
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // Navigation guard effect
+    useEffect(() => {
+        // Skip during loading
+        if (loading) return;
+
+        // If the user is not logged in and not on login page, redirect to login
+        if (!user && !['/login', '/admin/login'].includes(location.pathname)) {
+            navigate('/login', { replace: true });
+            return;
+        }
+
+        // If user is logged in and on a login page, redirect to dashboard
+        if (user && ['/login', '/admin/login'].includes(location.pathname)) {
+            navigate('/', { replace: true });
+            return;
+        }
+
+        // Check admin route access
+        if (user && ADMIN_ROUTES.some(route => location.pathname.startsWith(route))) {
+            if (userRole !== 'admin' && userRole !== 'supervisor') {
+                console.log('Access denied: Admin-only route');
+                navigate('/', { replace: true });
+                return;
+            }
+        }
+
+        // Check full admin route access
+        if (user && FULL_ADMIN_ROUTES.some(route => location.pathname.startsWith(route))) {
+            if (userRole !== 'admin') {
+                console.log('Access denied: Full admin-only route');
+                navigate('/', { replace: true });
+                return;
+            }
+        }
+    }, [user, loading, userRole, location.pathname, navigate]);
 
     // Function to fetch user role from the database
     const fetchUserRole = async (userId, userEmail) => {
@@ -151,6 +204,7 @@ export function AuthProvider({ children }) {
     const signOut = () => {
         return firebaseSignOut(auth).then(() => {
             setUserRole(null);
+            navigate('/login');
         });
     };
 
