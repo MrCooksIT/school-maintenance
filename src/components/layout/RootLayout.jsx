@@ -1,6 +1,6 @@
-// src/components/layout/RootLayout.jsx
-import React, { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+// src/components/layout/RootLayout.jsx - Updated with Debug Info
+import React, { useState, useEffect } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import Sidebar from './Sidebar';
 import {
@@ -109,6 +109,13 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
 const RootLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { userRole, signOut } = useAuth();
+    const location = useLocation();
+
+    // Debug - log current location and role
+    useEffect(() => {
+        console.log('Current location:', location.pathname);
+        console.log('Current user role:', userRole);
+    }, [location, userRole]);
 
     const toggleSidebar = () => {
         setIsSidebarOpen((prev) => !prev);
@@ -119,7 +126,11 @@ const RootLayout = () => {
             <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
             <div className="flex-1 flex flex-col transition-all duration-300">
                 <Header toggleSidebar={toggleSidebar} userRole={userRole} signOut={signOut} />
-                <main className="flex-1 mt-16 p-4 overflow-auto">
+                <main className="flex-1 mt-16 p-4 overflow-auto relative">
+                    {/* Debug indicator to show current path */}
+                    <div className="bg-blue-100 p-2 text-xs text-blue-800 rounded mb-4">
+                        Current path: {location.pathname}
+                    </div>
                     <Outlet />
                 </main>
             </div>

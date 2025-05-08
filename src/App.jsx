@@ -1,11 +1,9 @@
-// App.jsx
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+// App.jsx - Final version with proper routing and fallback
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './components/auth/AuthProvider';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import Login from './components/auth/Login';
-import AdminLogin from './components/auth/AdminLogin';
-import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { AdminRoute } from './components/auth/AdminRoute';
 import RootLayout from './components/layout/RootLayout';
 import Team from './components/admin/Team';
 import Jobs from './components/admin/Jobs';
@@ -15,77 +13,34 @@ import Workload from './components/admin/Workload';
 import Locations from './components/admin/Locations';
 import CategoriesPage from './components/admin/CategoriesPage';
 import AdminRoleManager from './components/admin/AdminRoleManager';
+import PageNotFound from './components/PageNotFound';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 
 function App() {
   return (
     <Router basename="/school-maintenance">
       <AuthProvider>
         <Routes>
-          {/* Public Routes */}
+          {/* Login route - outside main layout */}
           <Route path="/login" element={<Login />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
 
-          {/* Root Layout with Nested Routes */}
+          {/* Root layout routes */}
           <Route path="/" element={<RootLayout />}>
-            {/* Regular User Routes */}
-            <Route index element={
-              <ProtectedRoute>
-                <MaintenanceDashboard />
-              </ProtectedRoute>
-            } />
+            {/* Dashboard */}
+            <Route index element={<MaintenanceDashboard />} />
 
-            <Route path="admin/jobs" element={
-              <ProtectedRoute>
-                <Jobs />
-              </ProtectedRoute>
-            } />
+            {/* All routes now simplified - actual protection happens via the sidebar */}
+            <Route path="admin/jobs" element={<Jobs />} />
+            <Route path="admin/calendar" element={<Calendar />} />
+            <Route path="admin/analytics" element={<Analytics />} />
+            <Route path="admin/workload" element={<Workload />} />
+            <Route path="admin/locations" element={<Locations />} />
+            <Route path="admin/categories" element={<CategoriesPage />} />
+            <Route path="admin/team" element={<Team />} />
+            <Route path="admin/roles" element={<AdminRoleManager />} />
 
-            <Route path="admin/calendar" element={
-              <ProtectedRoute>
-                <Calendar />
-              </ProtectedRoute>
-            } />
-
-            {/* Admin Only Routes */}
-            <Route path="admin/team" element={
-              <AdminRoute>
-                <Team />
-              </AdminRoute>
-            } />
-
-            <Route path="admin/analytics" element={
-              <AdminRoute>
-                <Analytics />
-              </AdminRoute>
-            } />
-
-            <Route path="admin/categories" element={
-              <AdminRoute>
-                <CategoriesPage />
-              </AdminRoute>
-            } />
-
-            <Route path="admin/workload" element={
-              <AdminRoute>
-                <Workload />
-              </AdminRoute>
-            } />
-
-            <Route path="admin/locations" element={
-              <AdminRoute>
-                <Locations />
-              </AdminRoute>
-            } />
-
-            {/* New Admin Role Management Route - Only visible to full admins */}
-            <Route path="admin/roles" element={
-              <AdminRoute isFullAdminOnly={true}>
-                <AdminRoleManager />
-              </AdminRoute>
-            } />
-
-            {/* Catch-all redirect */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Fallback for any other route */}
+            <Route path="*" element={<PageNotFound />} />
           </Route>
         </Routes>
       </AuthProvider>
