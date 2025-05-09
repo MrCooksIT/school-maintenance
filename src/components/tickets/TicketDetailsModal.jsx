@@ -21,13 +21,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Edit2, Save, X, MessageSquare, FileText, Calendar, Clock, MapPin, Paperclip } from 'lucide-react';
+import { Edit2, Save, X, MessageSquare, FileText, Calendar, Clock, MapPin, Paperclip, LockIcon } from 'lucide-react';
 import { TicketComments } from './TicketComments';
 import { FileAttachments } from './FileAttachments';
 import { useToast } from "@/components/ui/use-toast";
 import { format } from 'date-fns';
 import NotificationService from '../services/notificationService';
 import { useAuth } from '@/components/auth/AuthProvider';
+
 
 const STATUS_OPTIONS = [
   { value: 'new', label: 'New' },
@@ -72,8 +73,9 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
   const [isPauseModalOpen, setIsPauseModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const { user } = useAuth();
-  // Create unique IDs for accessibility
-  const dialogDescriptionId = "ticket-details-description";
+
+  // Determine if editing should be disabled (for completed tickets)
+  const isCompleted = ticket && ticket.status === 'completed';
 
   useEffect(() => {
     if (ticket) {
@@ -151,38 +153,14 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
   };
 
   const handleQuickUpdate = async (field, value) => {
-    if (!ticket) return;
+    if (!ticket || isCompleted) return; // Prevent updates if ticket is completed
     try {
       const ticketRef = ref(database, `tickets/${ticket.id}`);
-
-      // Create the update object
-      const updates = {
+      await update(ticketRef, {
         [field]: value,
         lastUpdated: new Date().toISOString()
-      };
-
-      // If we're setting status to completed, add the completion timestamp
-      if (field === 'status' && value === 'completed') {
-        updates.completedAt = new Date().toISOString();
-
-        // Also add to status history
-        const historyRef = ref(database, `tickets/${ticket.id}/statusHistory`);
-        push(historyRef, {
-          status: 'completed',
-          timestamp: new Date().toISOString(),
-          by: user?.uid || 'unknown' // if you have current user context
-        });
-      }
-
-      // Update the ticket
-      await update(ticketRef, updates);
-
-      // Update local state
-      setEditedData(prev => ({
-        ...prev,
-        [field]: value,
-        ...(field === 'status' && value === 'completed' ? { completedAt: new Date().toISOString() } : {})
-      }));
+      });
+      setEditedData(prev => ({ ...prev, [field]: value }));
 
       toast({
         title: "Update Successful",
@@ -200,6 +178,15 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
   };
 
   const handleSaveChanges = async () => {
+    if (isCompleted) {
+      toast({
+        title: "Cannot Edit Closed Ticket",
+        description: "This ticket is closed and cannot be modified",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const hasChanges = Object.entries(editedData).some(([key, value]) => {
       return ticket[key] !== value && key !== 'lastUpdated';
     });
@@ -230,6 +217,54 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
     }
   };
 
+  // Special function to allow re-opening a completed ticket
+  const handleReopenTicket = async () => {
+    if (!isCompleted) return;
+
+    try {
+      const ticketRef = ref(database, `tickets/${ticket.id}`);
+      await update(ticketRef, {
+        status: 'in-progress',
+        completedAt: null,
+        lastUpdated: new Date().toISOString(),
+        reopenedAt: new Date().toISOString(),
+        // Flag to prevent duplicate notifications from Google Apps Script
+        skipEmailNotification: true
+      });
+
+      // Add a system comment about reopening
+      const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+      await push(commentsRef, {
+        content: "Ticket has been reopened",
+        user: 'System',
+        userEmail: 'system@maintenance.app',
+        timestamp: new Date().toISOString(),
+        isSystemComment: true
+      });
+
+      setEditedData(prev => ({
+        ...prev,
+        status: 'in-progress',
+        completedAt: null,
+        reopenedAt: new Date().toISOString(),
+        skipEmailNotification: true
+      }));
+
+      toast({
+        title: "Ticket Reopened",
+        description: "The ticket has been successfully reopened",
+        variant: "success"
+      });
+    } catch (error) {
+      console.error('Error reopening ticket:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reopen ticket",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (!ticket) {
     return null;
   }
@@ -238,11 +273,11 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         className="w-full max-w-[90vw] md:max-w-4xl lg:max-w-5xl p-0 max-h-[90vh] overflow-hidden flex flex-col"
-        aria-describedby={dialogDescriptionId}
+        aria-describedby="ticket-details-description"
       >
-        <DialogHeader className="p-4 bg-white">
+        <DialogHeader className="sr-only">
           <DialogTitle>Ticket Details: {ticket.ticketId}</DialogTitle>
-          <DialogDescription id={dialogDescriptionId}>
+          <DialogDescription id="ticket-details-description">
             View and manage details, comments, and files for ticket {ticket.ticketId}
           </DialogDescription>
         </DialogHeader>
@@ -253,45 +288,61 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
             <div className="flex items-center gap-4">
               <span className="text-2xl font-bold">{ticket.ticketId}</span>
               <div className="flex items-center gap-2">
-                <Select
-                  value={editedData.priority}
-                  onValueChange={(value) => handleQuickUpdate('priority', value)}
-                >
-                  <SelectTrigger className="border-0 bg-transparent p-0 h-8 w-auto">
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityStyle(editedData.priority)}`}>
-                      {editedData.priority?.toUpperCase()}
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORITY_OPTIONS.map((priority) => (
-                      <SelectItem key={priority.value} value={priority.value}>
-                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityStyle(priority.value)}`}>
-                          {priority.label.toUpperCase()}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isCompleted ? (
+                  // Show static badge for completed tickets
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityStyle(editedData.priority)}`}>
+                    {editedData.priority?.toUpperCase()}
+                  </div>
+                ) : (
+                  // Allow editing for non-completed tickets
+                  <Select
+                    value={editedData.priority}
+                    onValueChange={(value) => handleQuickUpdate('priority', value)}
+                  >
+                    <SelectTrigger className="border-0 bg-transparent p-0 h-8 w-auto">
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${getPriorityStyle(editedData.priority)}`}>
+                        {editedData.priority?.toUpperCase()}
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRIORITY_OPTIONS.map((priority) => (
+                        <SelectItem key={priority.value} value={priority.value}>
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityStyle(priority.value)}`}>
+                            {priority.label.toUpperCase()}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
-                <Select
-                  value={editedData.status}
-                  onValueChange={(value) => handleQuickUpdate('status', value)}
-                >
-                  <SelectTrigger className="border-0 bg-transparent p-0 h-8 w-auto">
-                    <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(editedData.status)}`}>
-                      {editedData.status === 'in-progress' ? 'IN PROGRESS' : editedData.status?.toUpperCase()}
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map((status) => (
-                      <SelectItem key={status.value} value={status.value}>
-                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyle(status.value)}`}>
-                          {status.label.toUpperCase()}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isCompleted ? (
+                  // Show static badge for completed tickets
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(editedData.status)}`}>
+                    {editedData.status === 'in-progress' ? 'IN PROGRESS' : editedData.status?.toUpperCase()}
+                  </div>
+                ) : (
+                  // Allow editing for non-completed tickets
+                  <Select
+                    value={editedData.status}
+                    onValueChange={(value) => handleQuickUpdate('status', value)}
+                  >
+                    <SelectTrigger className="border-0 bg-transparent p-0 h-8 w-auto">
+                      <div className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusStyle(editedData.status)}`}>
+                        {editedData.status === 'in-progress' ? 'IN PROGRESS' : editedData.status?.toUpperCase()}
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status.value} value={status.value}>
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusStyle(status.value)}`}>
+                            {status.label.toUpperCase()}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
             <Button
@@ -318,6 +369,12 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
               <Paperclip className="h-4 w-4" />
               Files: {attachmentCount}
             </div>
+            {isCompleted && (
+              <div className="flex items-center gap-1 ml-auto">
+                <LockIcon className="h-4 w-4 text-yellow-300" />
+                <span className="text-yellow-300">Ticket Closed</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -348,35 +405,57 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
 
           <div className="flex-1 overflow-auto">
             {/* Details Tab */}
-            {activeTab === 'details' && (
-              <div className="p-6 h-full">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left column */}
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Subject</label>
-                      <Input
-                        value={editedData.subject || ''}
-                        onChange={(e) => setEditedData(prev => ({ ...prev, subject: e.target.value }))}
-                        onBlur={() => editedData.subject !== ticket.subject && handleQuickUpdate('subject', editedData.subject)}
-                        className="border-gray-300"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Description</label>
-                      <Textarea
-                        value={editedData.description || ''}
-                        onChange={(e) => setEditedData(prev => ({ ...prev, description: e.target.value }))}
-                        onBlur={() => editedData.description !== ticket.description && handleQuickUpdate('description', editedData.description)}
-                        className="border-gray-300 min-h-[150px]"
-                      />
-                    </div>
+            <TabsContent value="details" className="p-6 h-full" forceMount={activeTab === 'details'}>
+              {isCompleted && (
+                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+                  <LockIcon className="h-5 w-5 text-yellow-600 flex-shrink-0" />
+                  <div>
+                    <h3 className="font-medium text-yellow-800">This ticket is closed</h3>
+                    <p className="text-sm text-yellow-700">Closed tickets are read-only and cannot be modified</p>
+                  </div>
+                </div>
+              )}
 
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold text-gray-700">Location</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left column */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Subject</label>
+                    <Input
+                      value={editedData.subject || ''}
+                      onChange={(e) => !isCompleted && setEditedData(prev => ({ ...prev, subject: e.target.value }))}
+                      onBlur={() => !isCompleted && editedData.subject !== ticket.subject && handleQuickUpdate('subject', editedData.subject)}
+                      className={`border-gray-300 ${isCompleted ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      disabled={isCompleted}
+                      readOnly={isCompleted}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Description</label>
+                    <Textarea
+                      value={editedData.description || ''}
+                      onChange={(e) => !isCompleted && setEditedData(prev => ({ ...prev, description: e.target.value }))}
+                      onBlur={() => !isCompleted && editedData.description !== ticket.description && handleQuickUpdate('description', editedData.description)}
+                      className={`border-gray-300 min-h-[150px] ${isCompleted ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      disabled={isCompleted}
+                      readOnly={isCompleted}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">Location</label>
+                    {isCompleted ? (
+                      <Input
+                        value={getLocationName(editedData.location) || "None"}
+                        className="bg-gray-100 cursor-not-allowed"
+                        disabled
+                        readOnly
+                      />
+                    ) : (
                       <Select
                         value={editedData.location || 'none'}
                         onValueChange={(value) => handleQuickUpdate('location', value === 'none' ? null : value)}
+                        disabled={isCompleted}
                       >
                         <SelectTrigger className="border-gray-300">
                           <SelectValue placeholder="Select location">
@@ -392,26 +471,32 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
+                    )}
                   </div>
+                </div>
 
-                  {/* Right column */}
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <h3 className="text-base font-medium text-gray-800 mb-3">Ticket Information</h3>
+                {/* Right column */}
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 className="text-base font-medium text-gray-800 mb-3">Ticket Information</h3>
 
-                      <div className="space-y-4">
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-600">Reported By:</span>
+                    <div className="space-y-4">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Reported By:</span>
+                        <span className="text-sm font-medium">
+                          {typeof editedData.requester === 'object'
+                            ? `${editedData.requester.name || ''} ${editedData.requester.surname || ''}`
+                            : editedData.requester}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Due Date:</span>
+                        {isCompleted ? (
                           <span className="text-sm font-medium">
-                            {typeof editedData.requester === 'object'
-                              ? `${editedData.requester.name || ''} ${editedData.requester.surname || ''}`
-                              : editedData.requester}
+                            {editedData.dueDate ? format(new Date(editedData.dueDate), 'dd/MM/yyyy') : 'None'}
                           </span>
-                        </div>
-
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Due Date:</span>
+                        ) : (
                           <Input
                             type="date"
                             value={editedData.dueDate || ''}
@@ -419,13 +504,20 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                             onBlur={() => editedData.dueDate !== ticket.dueDate && handleQuickUpdate('dueDate', editedData.dueDate)}
                             className="w-36 h-8 border-gray-300"
                           />
-                        </div>
+                        )}
+                      </div>
 
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-600">Category:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Category:</span>
+                        {isCompleted ? (
+                          <span className="text-sm font-medium">
+                            {getCategoryName(editedData.category) || "None"}
+                          </span>
+                        ) : (
                           <Select
                             value={editedData.category || 'none'}
                             onValueChange={(value) => handleQuickUpdate('category', value === 'none' ? null : value)}
+                            disabled={isCompleted}
                           >
                             <SelectTrigger className="w-36 h-8 border-gray-300">
                               <SelectValue placeholder="Select category">
@@ -441,24 +533,35 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                               ))}
                             </SelectContent>
                           </Select>
-                        </div>
-
-                        {editedData.completedAt && (
-                          <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Completed On:</span>
-                            <span className="text-sm font-medium">
-                              {format(new Date(editedData.completedAt), 'dd/MM/yyyy')}
-                            </span>
-                          </div>
                         )}
                       </div>
-                    </div>
 
-                    <div className="bg-[#0a1e46] p-4 rounded-lg">
-                      <h3 className="text-base font-medium text-white mb-3">Assignment</h3>
+                      {editedData.completedAt && (
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-600">Completed On:</span>
+                          <span className="text-sm font-medium">
+                            {format(new Date(editedData.completedAt), 'dd/MM/yyyy')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-[#0a1e46] p-4 rounded-lg">
+                    <h3 className="text-base font-medium text-white mb-3">Assignment</h3>
+                    {isCompleted ? (
+                      <div className="bg-white p-2 rounded text-center">
+                        <span>
+                          {editedData.assignedTo
+                            ? staffMembers?.find(s => s.id === editedData.assignedTo)?.name || 'Unknown Staff Member'
+                            : 'Unassigned'}
+                        </span>
+                      </div>
+                    ) : (
                       <Select
                         value={editedData.assignedTo || "unassigned"}
                         onValueChange={(value) => handleQuickUpdate('assignedTo', value === 'unassigned' ? null : value)}
+                        disabled={isCompleted}
                       >
                         <SelectTrigger className="bg-white">
                           <SelectValue placeholder="Assign to staff member" />
@@ -472,93 +575,102 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
+                    )}
+                  </div>
 
-                    {/* File Summary Panel */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                      <h3 className="text-base font-medium text-gray-800 mb-3 flex items-center">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Attached Files
-                      </h3>
-                      <div className="text-sm">
-                        {attachmentCount > 0 ? (
-                          <button
-                            className="text-blue-600 hover:underline flex items-center"
-                            onClick={() => setActiveTab('files')}
-                          >
-                            <span>View all {attachmentCount} files</span>
-                          </button>
-                        ) : (
-                          <span className="text-gray-500">No files attached</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="pt-4 flex gap-2">
-                      <Button
-                        onClick={handleSaveChanges}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        Save Changes
-                      </Button>
-
-                      {editedData.status !== 'completed' && (
-                        editedData.status === 'paused' ? (
-                          <Button
-                            onClick={() => {
-                              handleQuickUpdate('status', 'in-progress');
-                              handleQuickUpdate('pausedAt', null);
-                              handleQuickUpdate('pauseReason', null);
-
-                              // Add a system comment for resuming
-                              const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
-                              push(commentsRef, {
-                                content: "Ticket resumed from pause status",
-                                user: 'System',
-                                userEmail: 'system@maintenance.app',
-                                timestamp: new Date().toISOString(),
-                                isSystemComment: true
-                              });
-
-                              toast({
-                                title: "Ticket Resumed",
-                                description: "The ticket is now back in progress",
-                                variant: "info"
-                              });
-                            }}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                          >
-                            Resume Ticket
-                          </Button>
-                        ) : (
-                          // Pause button
-                          <Button
-                            onClick={() => setIsPauseModalOpen(true)}
-                            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                          >
-                            Pause Ticket
-                          </Button>
-                        )
+                  {/* File Summary Panel */}
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <h3 className="text-base font-medium text-gray-800 mb-3 flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Attached Files
+                    </h3>
+                    <div className="text-sm">
+                      {attachmentCount > 0 ? (
+                        <button
+                          className="text-blue-600 hover:underline flex items-center"
+                          onClick={() => setActiveTab('files')}
+                        >
+                          <span>View all {attachmentCount} files</span>
+                        </button>
+                      ) : (
+                        <span className="text-gray-500">No files attached</span>
                       )}
                     </div>
                   </div>
+
+                  <div className="pt-4 flex gap-2">
+                    {isCompleted ? (
+                      // For completed tickets, show reopen button
+                      <Button
+                        onClick={handleReopenTicket}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        Reopen Ticket
+                      </Button>
+                    ) : (
+                      // For active tickets, show normal action buttons
+                      <>
+                        <Button
+                          onClick={handleSaveChanges}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          Save Changes
+                        </Button>
+
+                        {editedData.status !== 'completed' && (
+                          editedData.status === 'paused' ? (
+                            <Button
+                              onClick={() => {
+                                handleQuickUpdate('status', 'in-progress');
+                                handleQuickUpdate('pausedAt', null);
+                                handleQuickUpdate('pauseReason', null);
+
+                                // Add a system comment for resuming
+                                const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+                                push(commentsRef, {
+                                  content: "Ticket resumed from pause status",
+                                  user: 'System',
+                                  userEmail: 'system@maintenance.app',
+                                  timestamp: new Date().toISOString(),
+                                  isSystemComment: true
+                                });
+
+                                toast({
+                                  title: "Ticket Resumed",
+                                  description: "The ticket is now back in progress",
+                                  variant: "info"
+                                });
+                              }}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              Resume Ticket
+                            </Button>
+                          ) : (
+                            // Pause button
+                            <Button
+                              onClick={() => setIsPauseModalOpen(true)}
+                              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                            >
+                              Pause Ticket
+                            </Button>
+                          )
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
+            </TabsContent>
 
-            {/* Comments Tab */}
-            {activeTab === 'comments' && (
-              <div className="h-full">
-                <TicketComments ticketId={ticket.id} />
-              </div>
-            )}
+            {/* Comments Tab - Always available for all tickets */}
+            <TabsContent value="comments" className="h-full" forceMount={activeTab === 'comments'}>
+              <TicketComments ticketId={ticket.id} />
+            </TabsContent>
 
-            {/* Files Tab */}
-            {activeTab === 'files' && (
-              <div className="h-full p-4">
-                <FileAttachments ticketId={ticket.id} />
-              </div>
-            )}
+            {/* Files Tab - Always available for all tickets */}
+            <TabsContent value="files" className="h-full p-4" forceMount={activeTab === 'files'}>
+              <FileAttachments ticketId={ticket.id} />
+            </TabsContent>
           </div>
         </Tabs>
 
@@ -585,10 +697,10 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers }) => {
 
             // Send notifications to supervisor/estate manager if needed
             if (pauseData.notifySupervisor || pauseData.category === 'procurement') {
-              NotificationService.sendSimplePauseNotification(
+              NotificationService.sendPauseNotification(
                 ticket,
-                pauseData.reason,
-                pauseData.category
+                pauseData,
+                user?.uid || 'unknown-user'
               ).then(success => {
                 if (success) {
                   toast({
