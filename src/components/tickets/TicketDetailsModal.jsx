@@ -294,24 +294,6 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         reopenRequestedAt: new Date().toISOString()
       }));
 
-      // Create a notification for admins
-      try {
-        const notificationsRef = ref(database, 'notifications');
-        await push(notificationsRef, {
-          title: "Reopen Request",
-          message: `Ticket #${ticket.ticketId} has been requested to be reopened`,
-          type: "reopen_request",
-          userRole: "admin", // Target admins
-          ticketId: ticket.id,
-          ticketNumber: ticket.ticketId,
-          priority: ticket.priority,
-          createdAt: new Date().toISOString(),
-          read: false
-        });
-      } catch (err) {
-        console.error("Failed to create admin notification", err);
-      }
-
       toast({
         title: "Reopen Requested",
         description: "Your request to reopen this ticket has been submitted to administrators",
@@ -321,7 +303,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
       console.error('Error requesting reopen:', error);
       toast({
         title: "Error",
-        description: "Failed to request reopening",
+        description: "Failed to request reopening: " + error.message,
         variant: "destructive"
       });
     }
@@ -820,49 +802,26 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                   <div className="pt-4 flex gap-2">
                     {isCompleted ? (
                       // For completed tickets, show appropriate button based on reopen request status
-                      editedData.reopenRequested ? (
-                        <>
-                          <div className="bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md p-4 mb-4 text-sm">
+                      <div className="space-y-4">
+                        {editedData.reopenRequested ? (
+                          // Show pending message if reopen already requested
+                          <div className="bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md p-4 text-sm">
                             <p className="font-medium">Reopen request pending</p>
                             <p>An administrator must approve this ticket to be reopened.</p>
-                            {editedData.reopenRequestedAt && (
-                              <p className="mt-2 text-xs">
-                                Requested: {format(new Date(editedData.reopenRequestedAt), 'dd/MM/yyyy HH:mm')}
-                              </p>
-                            )}
+                            <p className="mt-2 text-xs">
+                              Requested: {editedData.reopenRequestedAt ? format(new Date(editedData.reopenRequestedAt), 'dd/MM/yyyy HH:mm') : 'Unknown date'}
+                            </p>
                           </div>
-
-                          {/* Admin can still approve even with the banner showing */}
-                          {isUserAdmin() && (
-                            <Button
-                              onClick={handleApproveReopen}
-                              className="w-full bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              Approve & Reopen
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          {/* Regular users just see request button */}
+                        ) : (
+                          // Regular user button to request reopening
                           <Button
                             onClick={handleRequestReopen}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-4"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             Request to Reopen
                           </Button>
-
-                          {/* Admins see direct reopen option */}
-                          {isUserAdmin() && (
-                            <Button
-                              onClick={handleDirectReopen}
-                              className="w-full bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              Directly Reopen (Admin)
-                            </Button>
-                          )}
-                        </>
-                      )
+                        )}
+                      </div>
                     ) : (
                       // For active tickets, show normal action buttons
                       <>

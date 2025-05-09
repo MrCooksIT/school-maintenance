@@ -1,4 +1,6 @@
 // src/components/layout/Sidebar.jsx
+import { RotateCcw } from 'lucide-react';
+import ReopenRequestsBadge from '../admin/ReopenRequestsBadge';
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
@@ -37,6 +39,13 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     // Admin-only routes
     const adminRoutes = [
         { name: 'Analytics', icon: <BarChart4 className="h-5 w-5" />, path: '/admin/analytics' },
+        {
+            name: 'Reopen Requests',
+            icon: <RotateCcw className="h-5 w-5" />,
+            path: '/admin/reopen-requests',
+            badge: <ReopenRequestsBadge /> // This will show the count badge
+        },
+        { name: 'Workload', icon: <Activity className="h-5 w-5" />, path: '/admin/workload' },
         { name: 'Workload', icon: <Activity className="h-5 w-5" />, path: '/admin/workload' },
         { name: 'Locations', icon: <MapPin className="h-5 w-5" />, path: '/admin/locations' },
         { name: 'Categories', icon: <FolderOpen className="h-5 w-5" />, path: '/admin/categories' },
@@ -115,16 +124,18 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                                     <Link
                                         key={item.path}
                                         to={item.path}
-                                        className={`flex items-center gap-3 px-4 py-2 mt-1 rounded-lg text-sm ${isActiveRoute(item.path)
+                                        className={`flex items-center justify-between px-4 py-2 mt-1 rounded-lg text-sm ${isActiveRoute(item.path)
                                             ? 'bg-blue-600 text-white'
                                             : 'text-gray-300 hover:bg-blue-700/50'
                                             }`}
                                     >
-                                        {item.icon}
-                                        {item.name}
+                                        <div className="flex items-center gap-3">
+                                            {item.icon}
+                                            {item.name}
+                                        </div>
+                                        {item.badge && item.badge}
                                     </Link>
                                 ))}
-
                                 {/* Full admin only routes */}
                                 {isFullAdmin && fullAdminRoutes.map((item) => (
                                     <Link

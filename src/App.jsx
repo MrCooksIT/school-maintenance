@@ -16,6 +16,7 @@ import Locations from './components/admin/Locations';
 import CategoriesPage from './components/admin/CategoriesPage';
 import AdminRoleManager from './components/admin/AdminRoleManager';
 import PageNotFound from './components/PageNotFound';
+import ReopenRequestsManager from './components/admin/ReopenRequestsManager';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
             <Route path="admin/categories" element={<CategoriesPage />} />
             <Route path="admin/team" element={<Team />} />
             <Route path="admin/roles" element={<AdminRoleManager />} />
+            <Route path="admin/reopen-requests" element={<ReopenRequestsManager />} />
 
             {/* Fallback */}
             <Route path="*" element={<PageNotFound />} />
