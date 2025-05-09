@@ -77,6 +77,24 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
   // Determine if editing should be disabled (for completed tickets)
   const isCompleted = ticket && ticket.status === 'completed';
 
+  // Determine if current user is an admin - made more permissive
+  const isUserAdmin = () => {
+    // More permissive admin check - consider any of these conditions sufficient
+    return (
+      userRole === 'admin' ||
+      userRole === 'supervisor' ||
+      userRole === 'estate_manager' ||
+      user?.isAdmin === true ||
+      user?.admin === true ||
+      user?.role === 'admin' ||
+      (user?.email && (
+        user?.email.includes('@admin') ||
+        user?.email.includes('estate') ||
+        user?.email.includes('supervisor')
+      ))
+    );
+  };
+
   useEffect(() => {
     if (ticket) {
       setEditedData(ticket);
@@ -155,11 +173,20 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
   const handleQuickUpdate = async (field, value) => {
     if (!ticket || isCompleted) return; // Prevent updates if ticket is completed
     try {
-      const ticketRef = ref(database, `tickets/${ticket.id}`);
-      await update(ticketRef, {
+      const updateData = {
         [field]: value,
         lastUpdated: new Date().toISOString()
-      });
+      };
+
+      // Special case for assignment changes - we need to ensure the Google Apps Script can detect the change
+      if (field === 'assignedTo') {
+        // Reset the assignmentNotified flag to ensure the notification is sent
+        // Do NOT set skipEmailNotification flag for assignments
+        updateData.assignmentNotified = null;
+      }
+
+      const ticketRef = ref(database, `tickets/${ticket.id}`);
+      await update(ticketRef, updateData);
       setEditedData(prev => ({ ...prev, [field]: value }));
 
       toast({
@@ -289,10 +316,8 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
   const handleApproveReopen = async () => {
     if (!isCompleted || !editedData.reopenRequested) return;
 
-    // Check if user is admin - you'll need to adapt this to your auth system
-    const isAdmin = userRole === 'admin' || user?.email?.includes('@admin') || user?.isAdmin;
-
-    if (!isAdmin) {
+    // Check if user is admin using our helper function
+    if (!isUserAdmin()) {
       toast({
         title: "Permission Denied",
         description: "Only administrators can approve reopening tickets",
@@ -348,6 +373,68 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
       toast({
         title: "Error",
         description: "Failed to approve reopening",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Direct reopen for admins (bypass the request process)
+  const handleDirectReopen = async () => {
+    if (!isCompleted) return;
+
+    // Check if user is admin using our helper function
+    if (!isUserAdmin()) {
+      toast({
+        title: "Permission Denied",
+        description: "Only administrators can directly reopen tickets",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const ticketRef = ref(database, `tickets/${ticket.id}`);
+      await update(ticketRef, {
+        status: 'in-progress',
+        completedAt: null,
+        reopenedAt: new Date().toISOString(),
+        reopenedBy: user?.uid || 'admin-user',
+        lastUpdated: new Date().toISOString(),
+        // Flag to prevent duplicate notifications from Google Apps Script
+        skipEmailNotification: true
+      });
+
+      // Add a system comment about the admin reopening
+      const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+      await push(commentsRef, {
+        content: "Ticket directly reopened by administrator",
+        user: 'System',
+        userEmail: 'system@maintenance.app',
+        timestamp: new Date().toISOString(),
+        isSystemComment: true
+      });
+
+      setEditedData(prev => ({
+        ...prev,
+        status: 'in-progress',
+        completedAt: null,
+        reopenedAt: new Date().toISOString(),
+        skipEmailNotification: true
+      }));
+
+      toast({
+        title: "Ticket Reopened",
+        description: "The ticket has been successfully reopened",
+        variant: "success"
+      });
+
+      // Close the modal after reopening
+      onClose();
+    } catch (error) {
+      console.error('Error reopening ticket:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reopen ticket",
         variant: "destructive"
       });
     }
@@ -705,15 +792,25 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                     {isCompleted ? (
                       // For completed tickets, show appropriate button based on reopen request status
                       editedData.reopenRequested ? (
-                        // Show pending message if reopen already requested
-                        <div className="flex-1 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md p-2 text-center text-sm">
-                          Reopen request pending admin approval
-                        </div>
-                      ) : (
-                        // For admin, show both request and approve buttons
-                        // For regular users, just show request button
-                        // You'll need to adapt the isAdmin check to your auth system
                         <>
+                          {/* Show pending message if reopen already requested */}
+                          <div className="flex-1 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md p-2 text-center text-sm">
+                            Reopen request pending admin approval
+                          </div>
+
+                          {/* Admin can still approve even with the banner showing */}
+                          {isUserAdmin() && (
+                            <Button
+                              onClick={handleApproveReopen}
+                              className="flex-shrink-0 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              Approve & Reopen
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {/* Regular users just see request button */}
                           <Button
                             onClick={handleRequestReopen}
                             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
@@ -721,12 +818,13 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                             Request to Reopen
                           </Button>
 
-                          {(userRole === 'admin' || user?.email?.includes('@admin') || user?.isAdmin) && (
+                          {/* Admins see both options */}
+                          {isUserAdmin() && (
                             <Button
-                              onClick={handleApproveReopen}
+                              onClick={handleDirectReopen}
                               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                             >
-                              Approve & Reopen (Admin)
+                              Directly Reopen (Admin)
                             </Button>
                           )}
                         </>
