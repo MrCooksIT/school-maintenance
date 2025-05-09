@@ -46,7 +46,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             badge: <ReopenRequestsBadge /> // This will show the count badge
         },
         { name: 'Workload', icon: <Activity className="h-5 w-5" />, path: '/admin/workload' },
-        { name: 'Workload', icon: <Activity className="h-5 w-5" />, path: '/admin/workload' },
         { name: 'Locations', icon: <MapPin className="h-5 w-5" />, path: '/admin/locations' },
         { name: 'Categories', icon: <FolderOpen className="h-5 w-5" />, path: '/admin/categories' },
         { name: 'Team', icon: <Users className="h-5 w-5" />, path: '/admin/team' },
