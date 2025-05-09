@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import AdminReopenHandler from './AdminReopenHandler';
 import {
   Select,
   SelectContent,
@@ -73,26 +74,40 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
   const [isPauseModalOpen, setIsPauseModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const { user } = useAuth();
-  
+
   // Determine if editing should be disabled (for completed tickets)
   const isCompleted = ticket && ticket.status === 'completed';
 
   // Determine if current user is an admin - made more permissive
-  const isUserAdmin = () => {
-    // More permissive admin check - consider any of these conditions sufficient
-    return (
-      userRole === 'admin' || 
+  const isUserAdmin = (user, userRole) => {
+    // Check multiple sources of admin status
+    const isAdmin =
+      // Check from AuthProvider
+      userRole === 'admin' ||
       userRole === 'supervisor' ||
       userRole === 'estate_manager' ||
+      // Check from user object
       user?.isAdmin === true ||
       user?.admin === true ||
       user?.role === 'admin' ||
+      // Check from email patterns
       (user?.email && (
-        user?.email.includes('@admin') || 
+        user?.email.includes('@admin') ||
         user?.email.includes('estate') ||
-        user?.email.includes('supervisor')
-      ))
-    );
+        user?.email.includes('supervisor') ||
+        user?.email.includes('acoetzee')
+      )) ||
+      // Check localStorage for debug override
+      localStorage.getItem('debug_admin_override') === 'true';
+
+    // Log the admin status check for debugging
+    console.log('Admin status check:', {
+      userRole,
+      email: user?.email,
+      result: isAdmin
+    });
+
+    return isAdmin;
   };
 
   useEffect(() => {
@@ -177,14 +192,14 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         [field]: value,
         lastUpdated: new Date().toISOString()
       };
-      
+
       // Special case for assignment changes - we need to ensure the Google Apps Script can detect the change
       if (field === 'assignedTo') {
         // Reset the assignmentNotified flag to ensure the notification is sent
         // Do NOT set skipEmailNotification flag for assignments
         updateData.assignmentNotified = null;
       }
-      
+
       const ticketRef = ref(database, `tickets/${ticket.id}`);
       await update(ticketRef, updateData);
       setEditedData(prev => ({ ...prev, [field]: value }));
@@ -213,7 +228,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
       });
       return;
     }
-    
+
     const hasChanges = Object.entries(editedData).some(([key, value]) => {
       return ticket[key] !== value && key !== 'lastUpdated';
     });
@@ -227,7 +242,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
           description: "All changes have been saved successfully",
           variant: "success"
         });
-        
+
         // Close the modal after saving changes
         onClose();
       }).catch(error => {
@@ -244,7 +259,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         description: "No changes to save",
         variant: "info"
       });
-      
+
       // Close the modal even if there are no changes
       onClose();
     }
@@ -253,7 +268,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
   // Updated function to request reopening a ticket instead of directly reopening it
   const handleRequestReopen = async () => {
     if (!isCompleted) return;
-    
+
     try {
       const ticketRef = ref(database, `tickets/${ticket.id}`);
       await update(ticketRef, {
@@ -262,7 +277,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         reopenRequestedBy: user?.uid || 'unknown-user',
         lastUpdated: new Date().toISOString()
       });
-      
+
       // Add a system comment about the reopen request
       const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
       await push(commentsRef, {
@@ -272,13 +287,13 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         timestamp: new Date().toISOString(),
         isSystemComment: true
       });
-      
-      setEditedData(prev => ({ 
-        ...prev, 
+
+      setEditedData(prev => ({
+        ...prev,
         reopenRequested: true,
         reopenRequestedAt: new Date().toISOString()
       }));
-      
+
       // Create a notification for admins
       try {
         const notificationsRef = ref(database, 'notifications');
@@ -296,7 +311,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
       } catch (err) {
         console.error("Failed to create admin notification", err);
       }
-      
+
       toast({
         title: "Reopen Requested",
         description: "Your request to reopen this ticket has been submitted to administrators",
@@ -311,11 +326,11 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
       });
     }
   };
-  
+
   // Admin function to approve reopening a ticket
   const handleApproveReopen = async () => {
     if (!isCompleted || !editedData.reopenRequested) return;
-    
+
     // Check if user is admin using our helper function
     if (!isUserAdmin()) {
       toast({
@@ -325,7 +340,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
       });
       return;
     }
-    
+
     try {
       const ticketRef = ref(database, `tickets/${ticket.id}`);
       await update(ticketRef, {
@@ -339,7 +354,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         // Flag to prevent duplicate notifications from Google Apps Script
         skipEmailNotification: true
       });
-      
+
       // Add a system comment about the reopen approval
       const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
       await push(commentsRef, {
@@ -349,9 +364,9 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         timestamp: new Date().toISOString(),
         isSystemComment: true
       });
-      
-      setEditedData(prev => ({ 
-        ...prev, 
+
+      setEditedData(prev => ({
+        ...prev,
         status: 'in-progress',
         completedAt: null,
         reopenRequested: false,
@@ -359,13 +374,13 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         reopenedAt: new Date().toISOString(),
         skipEmailNotification: true
       }));
-      
+
       toast({
         title: "Ticket Reopened",
         description: "The ticket has been successfully reopened",
         variant: "success"
       });
-      
+
       // Close the modal after approving
       onClose();
     } catch (error) {
@@ -379,20 +394,12 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
   };
 
   // Direct reopen for admins (bypass the request process)
-  const handleDirectReopen = async () => {
-    if (!isCompleted) return;
-    
-    // Check if user is admin using our helper function
-    if (!isUserAdmin()) {
-      toast({
-        title: "Permission Denied",
-        description: "Only administrators can directly reopen tickets",
-        variant: "destructive"
-      });
-      return;
-    }
-    
+  const handleDirectReopen = async (ticket, user, toast, onClose) => {
+    if (!ticket) return;
+
     try {
+      console.log('Directly reopening ticket:', ticket.id);
+
       const ticketRef = ref(database, `tickets/${ticket.id}`);
       await update(ticketRef, {
         status: 'in-progress',
@@ -400,11 +407,11 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         reopenedAt: new Date().toISOString(),
         reopenedBy: user?.uid || 'admin-user',
         lastUpdated: new Date().toISOString(),
-        // Flag to prevent duplicate notifications from Google Apps Script
+        // Flag to prevent duplicate notifications
         skipEmailNotification: true
       });
-      
-      // Add a system comment about the admin reopening
+
+      // Add a system comment
       const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
       await push(commentsRef, {
         content: "Ticket directly reopened by administrator",
@@ -413,28 +420,23 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         timestamp: new Date().toISOString(),
         isSystemComment: true
       });
-      
-      setEditedData(prev => ({ 
-        ...prev, 
-        status: 'in-progress',
-        completedAt: null,
-        reopenedAt: new Date().toISOString(),
-        skipEmailNotification: true
-      }));
-      
+
       toast({
         title: "Ticket Reopened",
         description: "The ticket has been successfully reopened",
         variant: "success"
       });
-      
-      // Close the modal after reopening
-      onClose();
+
+      // Close the modal if provided
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       console.error('Error reopening ticket:', error);
+
       toast({
-        title: "Error",
-        description: "Failed to reopen ticket",
+        title: "Reopening Failed",
+        description: "There was an error reopening the ticket. Please try again.",
         variant: "destructive"
       });
     }
@@ -548,8 +550,8 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
               <div className="flex items-center gap-1 ml-auto">
                 <LockIcon className="h-4 w-4 text-yellow-300" />
                 <span className="text-yellow-300">
-                  {editedData.reopenRequested 
-                    ? "Reopen Requested" 
+                  {editedData.reopenRequested
+                    ? "Reopen Requested"
                     : "Ticket Closed"}
                 </span>
               </div>
@@ -593,8 +595,8 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                       {editedData.reopenRequested ? 'Reopen request pending' : 'This ticket is closed'}
                     </h3>
                     <p className={`text-sm ${editedData.reopenRequested ? 'text-blue-700' : 'text-yellow-700'}`}>
-                      {editedData.reopenRequested 
-                        ? 'An administrator must approve this ticket to be reopened' 
+                      {editedData.reopenRequested
+                        ? 'An administrator must approve this ticket to be reopened'
                         : 'Closed tickets are read-only and cannot be modified'}
                     </p>
                     {editedData.reopenRequestedAt && (
@@ -605,7 +607,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                   </div>
                 </div>
               )}
-            
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left column */}
                 <div className="space-y-4">
@@ -652,10 +654,10 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                             {getLocationName(editedData.location) || "Select location"}
                           </SelectValue>
                         </SelectTrigger>
-                        <SelectContent 
-                          style={{ 
-                            maxHeight: '300px', 
-                            overflowY: 'auto' 
+                        <SelectContent
+                          style={{
+                            maxHeight: '300px',
+                            overflowY: 'auto'
                           }}
                           className="max-h-[300px] overflow-y-auto scroll-auto"
                           sideOffset={4}
@@ -723,10 +725,10 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                                 {getCategoryName(editedData.category) || "Select category"}
                               </SelectValue>
                             </SelectTrigger>
-                            <SelectContent 
-                              style={{ 
-                                maxHeight: '300px', 
-                                overflowY: 'auto' 
+                            <SelectContent
+                              style={{
+                                maxHeight: '300px',
+                                overflowY: 'auto'
                               }}
                               className="max-h-[300px] overflow-y-auto scroll-auto"
                               sideOffset={4}
@@ -760,7 +762,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                     {isCompleted ? (
                       <div className="bg-white p-2 rounded text-center">
                         <span>
-                          {editedData.assignedTo 
+                          {editedData.assignedTo
                             ? staffMembers?.find(s => s.id === editedData.assignedTo)?.name || 'Unknown Staff Member'
                             : 'Unassigned'}
                         </span>
@@ -774,10 +776,10 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                         <SelectTrigger className="bg-white">
                           <SelectValue placeholder="Assign to staff member" />
                         </SelectTrigger>
-                        <SelectContent 
-                          style={{ 
-                            maxHeight: '300px', 
-                            overflowY: 'auto' 
+                        <SelectContent
+                          style={{
+                            maxHeight: '300px',
+                            overflowY: 'auto'
                           }}
                           className="max-h-[300px] overflow-y-auto scroll-auto"
                           sideOffset={4}
@@ -820,16 +822,21 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                       // For completed tickets, show appropriate button based on reopen request status
                       editedData.reopenRequested ? (
                         <>
-                          {/* Show pending message if reopen already requested */}
-                          <div className="flex-1 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md p-2 text-center text-sm">
-                            Reopen request pending admin approval
+                          <div className="bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md p-4 mb-4 text-sm">
+                            <p className="font-medium">Reopen request pending</p>
+                            <p>An administrator must approve this ticket to be reopened.</p>
+                            {editedData.reopenRequestedAt && (
+                              <p className="mt-2 text-xs">
+                                Requested: {format(new Date(editedData.reopenRequestedAt), 'dd/MM/yyyy HH:mm')}
+                              </p>
+                            )}
                           </div>
-                          
+
                           {/* Admin can still approve even with the banner showing */}
                           {isUserAdmin() && (
                             <Button
                               onClick={handleApproveReopen}
-                              className="flex-shrink-0 bg-green-600 hover:bg-green-700 text-white"
+                              className="w-full bg-green-600 hover:bg-green-700 text-white"
                             >
                               Approve & Reopen
                             </Button>
@@ -840,16 +847,16 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                           {/* Regular users just see request button */}
                           <Button
                             onClick={handleRequestReopen}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white mb-4"
                           >
                             Request to Reopen
                           </Button>
-                          
-                          {/* Admins see both options */}
+
+                          {/* Admins see direct reopen option */}
                           {isUserAdmin() && (
                             <Button
                               onClick={handleDirectReopen}
-                              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                              className="w-full bg-green-600 hover:bg-green-700 text-white"
                             >
                               Directly Reopen (Admin)
                             </Button>
@@ -889,7 +896,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                                   description: "The ticket is now back in progress",
                                   variant: "info"
                                 });
-                                
+
                                 // Close the modal after resuming
                                 onClose();
                               }}
@@ -969,7 +976,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
               description: "The ticket has been put on hold",
               variant: "info"
             });
-            
+
             // Close the modal after pausing
             onClose();
           }}
