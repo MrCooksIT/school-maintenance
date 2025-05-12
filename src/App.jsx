@@ -1,6 +1,6 @@
 // App.jsx with fully simplified routing structure
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './components/auth/AuthProvider';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import Login from './components/auth/Login';
@@ -18,9 +18,10 @@ import AdminRoleManager from './components/admin/AdminRoleManager';
 import PageNotFound from './components/PageNotFound';
 import ReopenRequestsManager from './components/admin/ReopenRequestsManager';
 
+
 function App() {
   return (
-    <Router basename="/school-maintenance">
+    <Router>
       <AuthProvider>
         <Routes>
           {/* Public routes */}
