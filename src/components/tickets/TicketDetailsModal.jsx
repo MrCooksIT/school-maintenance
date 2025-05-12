@@ -218,7 +218,62 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
       });
     }
   };
+  // Add this function to your component
+  const handleCloseTicket = async () => {
+    if (isCompleted) return;
 
+    // Ask for confirmation
+    if (!window.confirm('Are you sure you want to close this ticket? This will mark it as completed.')) {
+      return;
+    }
+
+    try {
+      const ticketRef = ref(database, `tickets/${ticket.id}`);
+      const now = new Date().toISOString();
+
+      // Update the ticket status
+      await update(ticketRef, {
+        status: 'completed',
+        completedAt: now,
+        lastUpdated: now,
+        // Flag to prevent duplicate notifications from Google Apps Script
+        skipEmailNotification: false // Set to true if you want to handle notifications manually
+      });
+
+      // Add a system comment
+      const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+      await push(commentsRef, {
+        content: "Ticket marked as completed",
+        user: 'System',
+        userEmail: 'system@maintenance.app',
+        timestamp: now,
+        isSystemComment: true
+      });
+
+      // Update local state
+      setEditedData(prev => ({
+        ...prev,
+        status: 'completed',
+        completedAt: now
+      }));
+
+      toast({
+        title: "Ticket Closed",
+        description: "The ticket has been marked as completed",
+        variant: "success"
+      });
+
+      // Close the modal
+      onClose();
+    } catch (error) {
+      console.error('Error closing ticket:', error);
+      toast({
+        title: "Error",
+        description: "Failed to close the ticket: " + error.message,
+        variant: "destructive"
+      });
+    }
+  };
   const handleSaveChanges = async () => {
     if (isCompleted) {
       toast({
@@ -799,29 +854,48 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                     </div>
                   </div>
 
+                  {/* Action Buttons */}
                   <div className="pt-4 flex gap-2">
                     {isCompleted ? (
                       // For completed tickets, show appropriate button based on reopen request status
-                      <div className="space-y-4">
-                        {editedData.reopenRequested ? (
-                          // Show pending message if reopen already requested
-                          <div className="bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md p-4 text-sm">
-                            <p className="font-medium">Reopen request pending</p>
-                            <p>An administrator must approve this ticket to be reopened.</p>
-                            <p className="mt-2 text-xs">
-                              Requested: {editedData.reopenRequestedAt ? format(new Date(editedData.reopenRequestedAt), 'dd/MM/yyyy HH:mm') : 'Unknown date'}
-                            </p>
+                      editedData.reopenRequested ? (
+                        <>
+                          {/* Show pending message if reopen already requested */}
+                          <div className="flex-1 bg-yellow-100 text-yellow-800 border border-yellow-200 rounded-md p-2 text-center text-sm">
+                            Reopen request pending admin approval
                           </div>
-                        ) : (
-                          // Regular user button to request reopening
+
+                          {/* Admin can still approve even with the banner showing */}
+                          {isUserAdmin() && (
+                            <Button
+                              onClick={handleApproveReopen}
+                              className="flex-shrink-0 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              Approve & Reopen
+                            </Button>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {/* Regular users just see request button */}
                           <Button
                             onClick={handleRequestReopen}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                           >
                             Request to Reopen
                           </Button>
-                        )}
-                      </div>
+
+                          {/* Admins see both options */}
+                          {isUserAdmin() && (
+                            <Button
+                              onClick={handleDirectReopen}
+                              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              Directly Reopen (Admin)
+                            </Button>
+                          )}
+                        </>
+                      )
                     ) : (
                       // For active tickets, show normal action buttons
                       <>
@@ -833,45 +907,56 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                         </Button>
 
                         {editedData.status !== 'completed' && (
-                          editedData.status === 'paused' ? (
-                            <Button
-                              onClick={() => {
-                                handleQuickUpdate('status', 'in-progress');
-                                handleQuickUpdate('pausedAt', null);
-                                handleQuickUpdate('pauseReason', null);
+                          <>
+                            {editedData.status === 'paused' ? (
+                              <Button
+                                onClick={() => {
+                                  handleQuickUpdate('status', 'in-progress');
+                                  handleQuickUpdate('pausedAt', null);
+                                  handleQuickUpdate('pauseReason', null);
 
-                                // Add a system comment for resuming
-                                const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
-                                push(commentsRef, {
-                                  content: "Ticket resumed from pause status",
-                                  user: 'System',
-                                  userEmail: 'system@maintenance.app',
-                                  timestamp: new Date().toISOString(),
-                                  isSystemComment: true
-                                });
+                                  // Add a system comment for resuming
+                                  const commentsRef = ref(database, `tickets/${ticket.id}/comments`);
+                                  push(commentsRef, {
+                                    content: "Ticket resumed from pause status",
+                                    user: 'System',
+                                    userEmail: 'system@maintenance.app',
+                                    timestamp: new Date().toISOString(),
+                                    isSystemComment: true
+                                  });
 
-                                toast({
-                                  title: "Ticket Resumed",
-                                  description: "The ticket is now back in progress",
-                                  variant: "info"
-                                });
+                                  toast({
+                                    title: "Ticket Resumed",
+                                    description: "The ticket is now back in progress",
+                                    variant: "info"
+                                  });
 
-                                // Close the modal after resuming
-                                onClose();
-                              }}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                              Resume Ticket
-                            </Button>
-                          ) : (
-                            // Pause button
-                            <Button
-                              onClick={() => setIsPauseModalOpen(true)}
-                              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                            >
-                              Pause Ticket
-                            </Button>
-                          )
+                                  // Close the modal after resuming
+                                  onClose();
+                                }}
+                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                              >
+                                Resume Ticket
+                              </Button>
+                            ) : (
+                              // Two buttons side by side: Pause and Close
+                              <>
+                                <Button
+                                  onClick={() => setIsPauseModalOpen(true)}
+                                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                                >
+                                  Pause Ticket
+                                </Button>
+
+                                <Button
+                                  onClick={handleCloseTicket}
+                                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  Close Ticket
+                                </Button>
+                              </>
+                            )}
+                          </>
                         )}
                       </>
                     )}
