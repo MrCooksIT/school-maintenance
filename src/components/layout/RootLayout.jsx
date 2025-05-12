@@ -123,6 +123,10 @@ const RootLayout = () => {
             {/* Main content - adjusts based on sidebar state */}
             <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
                 <Header toggleSidebar={toggleSidebar} userRole={userRole} signOut={signOut} />
+
+                <div className="sticky top-16 z-40 bg-red-100 border-2 border-red-500 p-2 m-2 rounded-md shadow-lg">
+                    <RoleDebugger />
+                </div>
                 <main className="flex-1 mt-16 p-4 overflow-auto">
                     <Outlet />
                 </main>
