@@ -108,6 +108,43 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         if (!user) return;
 
+        console.log("Setting up role listeners for user:", user.uid);
+
+        // Listen for changes in the admins collection for this user
+        const adminRef = ref(database, `admins/${user.uid}`);
+        const unsubscribeAdmin = onValue(adminRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const adminData = snapshot.val();
+                console.log("Admin role change detected:", adminData.role);
+                // Update the role state
+                setUserRole(adminData.role);
+            } else {
+                // If removed from admins, check staff role
+                const staffRef = ref(database, `staff/${user.uid}`);
+                const unsubscribeStaff = onValue(staffRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const staffData = snapshot.val();
+                        console.log("Staff role change detected:", staffData.role);
+                        setUserRole(staffData.role || 'staff');
+                    } else {
+                        console.log("User not found in admin or staff collections");
+                        setUserRole('staff'); // Default role
+                    }
+                });
+
+                return () => unsubscribeStaff();
+            }
+        });
+
+        return () => {
+            console.log("Cleaning up role listeners");
+            unsubscribeAdmin();
+        };
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+
         console.log("Setting up role listener for user:", user.uid);
 
         // Listen to the user's entry in the admins collection
@@ -138,49 +175,46 @@ export function AuthProvider({ children }) {
     // Function to set up default admin account
     const setupDefaultAdmin = async (userId, userEmail) => {
         try {
-            console.log(`Setting up default admin account for ${userEmail}`);
-
-            // Add user to admins collection
+            // Check if this user is already in the admins collection
             const adminRef = ref(database, `admins/${userId}`);
-            await set(adminRef, {
-                email: userEmail,
-                name: 'Default Admin',
-                role: 'admin',
-                permissions: {
-                    canManageUsers: true,
-                    canManageCategories: true,
-                    canManageLocations: true,
-                    canViewAnalytics: true,
-                    canViewWorkload: true
-                },
-                isDefaultAdmin: true,
-                createdAt: new Date().toISOString()
-            });
+            const snapshot = await get(adminRef);
 
-            // Also add to staff collection if not already there
-            const staffRef = ref(database, `staff/${userId}`);
-            const staffSnapshot = await get(staffRef);
-
-            if (!staffSnapshot.exists()) {
-                await set(staffRef, {
-                    name: 'Default Admin',
+            if (!snapshot.exists()) {
+                // Only set up the default admin if not already done
+                await set(adminRef, {
                     email: userEmail,
-                    department: 'Administration',
+                    name: 'Default Admin',
                     role: 'admin',
+                    permissions: {
+                        canManageUsers: true,
+                        canManageCategories: true,
+                        canManageLocations: true,
+                        canViewAnalytics: true,
+                        canViewWorkload: true
+                    },
+                    isDefaultAdmin: true,
                     createdAt: new Date().toISOString()
                 });
-            } else {
-                // Update existing staff entry with admin role
-                await update(staffRef, {
-                    role: 'admin',
-                    updatedAt: new Date().toISOString()
-                });
-            }
 
-            console.log('Default admin account set up successfully');
+                // Also ensure the user is in staff collection
+                const staffRef = ref(database, `staff/${userId}`);
+                const staffSnapshot = await get(staffRef);
+
+                if (!staffSnapshot.exists()) {
+                    await set(staffRef, {
+                        name: 'Default Admin',
+                        email: userEmail,
+                        department: 'Administration',
+                        role: 'admin',
+                        createdAt: new Date().toISOString()
+                    });
+                }
+
+                console.log("Default admin set up successfully for", userEmail);
+            }
             return true;
         } catch (error) {
-            console.error('Error setting up default admin:', error);
+            console.error("Error setting up default admin:", error);
             return false;
         }
     };

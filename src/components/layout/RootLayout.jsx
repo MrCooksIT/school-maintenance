@@ -14,6 +14,7 @@ import SimpleDropdown, {
     SimpleDropdownDivider,
     SimpleDropdownLabel
 } from '../ui/SimpleDropdown';
+import RoleDebugger from './RoleDebugger';
 
 // Simple Button Component
 const SimpleButton = ({ children, onClick, className = "", variant = "default" }) => {
@@ -105,7 +106,7 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
         </div>
     );
 };
-
+<RoleDebugger />
 const RootLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const { userRole, signOut } = useAuth();
