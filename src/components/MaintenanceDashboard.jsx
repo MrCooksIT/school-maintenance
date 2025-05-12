@@ -55,6 +55,52 @@ const StatusBadge = ({ status }) => {
     </Badge>
   );
 };
+const FirebaseDebugger = () => {
+  const [testValue, setTestValue] = useState(null);
+  const [error, setError] = useState(null);
+
+  const testFirebase = async () => {
+    try {
+      setError(null);
+      // Test write
+      const testRef = ref(database, 'test');
+      await set(testRef, {
+        timestamp: new Date().toISOString(),
+        test: 'This is a test write'
+      });
+
+      // Test read
+      const snapshot = await get(testRef);
+      setTestValue(snapshot.val());
+
+      alert('Firebase test successful!');
+    } catch (err) {
+      console.error('Firebase test error:', err);
+      setError(err.message);
+      alert('Firebase test failed: ' + err.message);
+    }
+  };
+
+  return (
+    <div className="p-4 border rounded-lg bg-gray-50 mb-6">
+      <h3 className="font-bold mb-2">Firebase Debug</h3>
+      <Button onClick={testFirebase}>Test Firebase Connection</Button>
+
+      {testValue && (
+        <div className="mt-2 p-2 bg-green-100 rounded">
+          <p>Test successful! Value:</p>
+          <pre className="text-xs">{JSON.stringify(testValue, null, 2)}</pre>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-2 p-2 bg-red-100 rounded">
+          <p>Error: {error}</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Priority Badge Component
 const PriorityBadge = ({ priority }) => {
