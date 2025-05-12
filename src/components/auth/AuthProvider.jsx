@@ -105,7 +105,36 @@ export function AuthProvider({ children }) {
             return 'staff'; // Default to staff on error
         }
     };
+    useEffect(() => {
+        if (!user) return;
 
+        console.log("Setting up role listener for user:", user.uid);
+
+        // Listen to the user's entry in the admins collection
+        const userAdminRef = ref(database, `admins/${user.uid}`);
+        const unsubscribeAdmin = onValue(userAdminRef, (snapshot) => {
+            if (snapshot.exists()) {
+                console.log("User is in admins collection, role:", snapshot.val().role);
+                setUserRole(snapshot.val().role || 'admin');
+            } else {
+                // If removed from admins, check staff collection
+                const userStaffRef = ref(database, `staff/${user.uid}`);
+                const unsubscribeStaff = onValue(userStaffRef, (snapshot) => {
+                    if (snapshot.exists() && snapshot.val().role) {
+                        console.log("User is in staff collection, role:", snapshot.val().role);
+                        setUserRole(snapshot.val().role);
+                    } else {
+                        console.log("User is not admin or has no special role");
+                        setUserRole('staff');
+                    }
+                });
+
+                return () => unsubscribeStaff();
+            }
+        });
+
+        return () => unsubscribeAdmin();
+    }, [user]);
     // Function to set up default admin account
     const setupDefaultAdmin = async (userId, userEmail) => {
         try {
