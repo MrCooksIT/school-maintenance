@@ -1,4 +1,4 @@
-// src/components/auth/AuthProvider.jsx with role-based navigation guard
+// src/components/auth/AuthProvider.jsx - Comprehensive fix
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth, database } from '../../config/firebase';
 import { ref, get, set, update, onValue } from 'firebase/database';
@@ -25,14 +25,17 @@ const FULL_ADMIN_ROUTES = [
     '/admin/roles'
 ];
 
-const DEFAULT_ADMIN_EMAIL = 'acoetzee@maristsj.co.za';
-
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [userRole, setUserRole] = useState(null);
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Add debug logging for role changes
+    useEffect(() => {
+        console.log("User role changed:", userRole);
+    }, [userRole]);
 
     // Navigation guard effect
     useEffect(() => {
@@ -70,16 +73,22 @@ export function AuthProvider({ children }) {
         }
     }, [user, loading, userRole, location.pathname, navigate]);
 
-    // Function to fetch user role from the database
-    const fetchUserRole = async (userId, userEmail) => {
+    // Function to manually fetch and update user role
+    const fetchAndUpdateUserRole = async (userId) => {
+        if (!userId) return 'staff';
+
         try {
-            // First check if user is in admin collection
+            console.log("Fetching role for user ID:", userId);
+
+            // First check admin collection
             const adminRef = ref(database, `admins/${userId}`);
             const adminSnapshot = await get(adminRef);
 
             if (adminSnapshot.exists()) {
-                // User is an admin
-                return adminSnapshot.val().role || 'admin';
+                const role = adminSnapshot.val().role || 'admin';
+                console.log(`User ${userId} found in admins collection with role:`, role);
+                setUserRole(role);
+                return role;
             }
 
             // Then check staff collection
@@ -87,53 +96,57 @@ export function AuthProvider({ children }) {
             const staffSnapshot = await get(staffRef);
 
             if (staffSnapshot.exists()) {
-                // User is staff, check if they have a role
-                return staffSnapshot.val().role || 'staff';
+                const role = staffSnapshot.val().role || 'staff';
+                console.log(`User ${userId} found in staff collection with role:`, role);
+                setUserRole(role);
+                return role;
             }
 
-            // If not found in either collection and is the default admin email,
-            // set up default admin access
-            if (userEmail === DEFAULT_ADMIN_EMAIL) {
-                await setupDefaultAdmin(userId, userEmail);
-                return 'admin';
-            }
-
-            // Default role
+            console.log(`User ${userId} not found in admins or staff collections, defaulting to 'staff'`);
+            setUserRole('staff');
             return 'staff';
         } catch (error) {
             console.error("Error fetching user role:", error);
-            return 'staff'; // Default to staff on error
+            setUserRole('staff');
+            return 'staff';
         }
     };
+
+    // Listen for role changes in real-time
     useEffect(() => {
         if (!user) return;
 
         console.log("Setting up role listeners for user:", user.uid);
 
-        // Listen for changes in the admins collection for this user
+        // IMPORTANT: Manual immediate role check
+        fetchAndUpdateUserRole(user.uid);
+
+        // Listen for admin role changes
         const adminRef = ref(database, `admins/${user.uid}`);
         const unsubscribeAdmin = onValue(adminRef, (snapshot) => {
             if (snapshot.exists()) {
                 const adminData = snapshot.val();
-                console.log("Admin role change detected:", adminData.role);
-                // Update the role state
-                setUserRole(adminData.role);
+                console.log("Admin role change detected for", user.email, "- new role:", adminData.role);
+                setUserRole(adminData.role || 'admin');
             } else {
-                // If removed from admins, check staff role
+                // If not in admins, check staff collection
                 const staffRef = ref(database, `staff/${user.uid}`);
                 const unsubscribeStaff = onValue(staffRef, (snapshot) => {
-                    if (snapshot.exists()) {
-                        const staffData = snapshot.val();
-                        console.log("Staff role change detected:", staffData.role);
-                        setUserRole(staffData.role || 'staff');
+                    if (snapshot.exists() && snapshot.val().role) {
+                        const staffRole = snapshot.val().role;
+                        console.log("Staff role change detected for", user.email, "- new role:", staffRole);
+                        setUserRole(staffRole);
                     } else {
-                        console.log("User not found in admin or staff collections");
-                        setUserRole('staff'); // Default role
+                        console.log("User not in admins or staff collections, setting as staff");
+                        setUserRole('staff');
                     }
                 });
 
+                // Clean up staff listener if admin listener is removed
                 return () => unsubscribeStaff();
             }
+        }, (error) => {
+            console.error("Error in admin role listener:", error);
         });
 
         return () => {
@@ -142,102 +155,14 @@ export function AuthProvider({ children }) {
         };
     }, [user]);
 
-    useEffect(() => {
-        if (!user) return;
-
-        console.log("Setting up role listener for user:", user.uid);
-
-        // Listen to the user's entry in the admins collection
-        const userAdminRef = ref(database, `admins/${user.uid}`);
-        const unsubscribeAdmin = onValue(userAdminRef, (snapshot) => {
-            if (snapshot.exists()) {
-                console.log("User is in admins collection, role:", snapshot.val().role);
-                setUserRole(snapshot.val().role || 'admin');
-            } else {
-                // If removed from admins, check staff collection
-                const userStaffRef = ref(database, `staff/${user.uid}`);
-                const unsubscribeStaff = onValue(userStaffRef, (snapshot) => {
-                    if (snapshot.exists() && snapshot.val().role) {
-                        console.log("User is in staff collection, role:", snapshot.val().role);
-                        setUserRole(snapshot.val().role);
-                    } else {
-                        console.log("User is not admin or has no special role");
-                        setUserRole('staff');
-                    }
-                });
-
-                return () => unsubscribeStaff();
-            }
-        });
-
-        return () => unsubscribeAdmin();
-    }, [user]);
-    // Function to set up default admin account
-    const setupDefaultAdmin = async (userId, userEmail) => {
-        try {
-            // Check if this user is already in the admins collection
-            const adminRef = ref(database, `admins/${userId}`);
-            const snapshot = await get(adminRef);
-
-            if (!snapshot.exists()) {
-                // Only set up the default admin if not already done
-                await set(adminRef, {
-                    email: userEmail,
-                    name: 'Default Admin',
-                    role: 'admin',
-                    permissions: {
-                        canManageUsers: true,
-                        canManageCategories: true,
-                        canManageLocations: true,
-                        canViewAnalytics: true,
-                        canViewWorkload: true
-                    },
-                    isDefaultAdmin: true,
-                    createdAt: new Date().toISOString()
-                });
-
-                // Also ensure the user is in staff collection
-                const staffRef = ref(database, `staff/${userId}`);
-                const staffSnapshot = await get(staffRef);
-
-                if (!staffSnapshot.exists()) {
-                    await set(staffRef, {
-                        name: 'Default Admin',
-                        email: userEmail,
-                        department: 'Administration',
-                        role: 'admin',
-                        createdAt: new Date().toISOString()
-                    });
-                }
-
-                console.log("Default admin set up successfully for", userEmail);
-            }
-            return true;
-        } catch (error) {
-            console.error("Error setting up default admin:", error);
-            return false;
-        }
-    };
-
+    // Auth state change
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged(async (authUser) => {
+            console.log("Auth state changed:", authUser ? authUser.email : "logged out");
             setUser(authUser);
 
             if (authUser) {
-                // Log the user's email - helpful for debugging
-                console.log(`User authenticated: ${authUser.email}`);
-
-                // Check if this is the default admin email
-                const isDefaultAdmin = authUser.email === DEFAULT_ADMIN_EMAIL;
-                if (isDefaultAdmin) {
-                    console.log("Default admin email detected!");
-                }
-
-                // Fetch user role when authenticated
-                const role = await fetchUserRole(authUser.uid, authUser.email);
-                setUserRole(role);
-
-                console.log(`User role set to: ${role}`);
+                // Do not set role here, it will be set by the real-time listener
             } else {
                 setUserRole(null);
             }
@@ -248,15 +173,22 @@ export function AuthProvider({ children }) {
         return unsubscribe;
     }, []);
 
+    // Function to manually refresh the user role
+    const refreshUserRole = async () => {
+        if (!user) return;
+
+        console.log("Manually refreshing role for user:", user.email);
+        return await fetchAndUpdateUserRole(user.uid);
+    };
+
     const signIn = async () => {
         const provider = new GoogleAuthProvider();
         try {
+            console.log("Starting Google sign in...");
             const result = await signInWithPopup(auth, provider);
+            console.log("Sign in successful for:", result.user.email);
 
-            // After successful sign-in, get the user role
-            const role = await fetchUserRole(result.user.uid, result.user.email);
-            setUserRole(role);
-
+            // Role will be set by the real-time listener
             return result.user;
         } catch (error) {
             console.error("Auth Error:", error);
@@ -283,6 +215,7 @@ export function AuthProvider({ children }) {
         signOut,
         userRole,
         isAdmin,
+        refreshUserRole
     };
 
     return (

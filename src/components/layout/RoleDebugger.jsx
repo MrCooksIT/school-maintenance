@@ -1,18 +1,22 @@
 // src/components/RoleDebugger.jsx
-import React from 'react';
-import { useAuth } from '../auth/AuthProvider';
-
+import React, { useState } from 'react';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 const RoleDebugger = () => {
     const { user, userRole, refreshUserRole } = useAuth();
+    const [refreshing, setRefreshing] = useState(false);
 
-    // Add a refresh function if available
-    const handleRefresh = () => {
+    const handleRefresh = async () => {
         if (refreshUserRole) {
-            refreshUserRole();
-            console.log("Manually refreshing user role");
-        } else {
-            console.log("refreshUserRole function not available");
+            setRefreshing(true);
+            try {
+                await refreshUserRole();
+                console.log("Manual role refresh completed");
+            } catch (error) {
+                console.error("Error refreshing role:", error);
+            } finally {
+                setRefreshing(false);
+            }
         }
     };
 
@@ -24,14 +28,13 @@ const RoleDebugger = () => {
                 <p><strong>User ID:</strong> {user ? user.uid : 'none'}</p>
                 <p><strong>Role:</strong> <span className="font-bold">{userRole || 'none'}</span></p>
             </div>
-            {refreshUserRole && (
-                <button
-                    onClick={handleRefresh}
-                    className="mt-2 px-3 py-1 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600"
-                >
-                    Refresh Role
-                </button>
-            )}
+            <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="mt-2 px-3 py-1 bg-blue-500 text-white rounded-md text-xs hover:bg-blue-600 disabled:opacity-50"
+            >
+                {refreshing ? "Refreshing..." : "Refresh Role"}
+            </button>
         </div>
     );
 };
