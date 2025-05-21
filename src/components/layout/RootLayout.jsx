@@ -1,5 +1,5 @@
 // src/components/layout/RootLayout.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
@@ -46,14 +46,12 @@ useEffect(() => {
             setShowDebug(prev => !prev);
         }
     };
-
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
         window.removeEventListener('keydown', handleKeyDown);
     };
 }, []);
-
 // Header Component
 const Header = ({ toggleSidebar, userRole, signOut }) => {
     const navigate = useNavigate();
@@ -77,7 +75,11 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
                     <h1 className="text-xl font-semibold">SJMC Maintenance Portal</h1>
                 </div>
             </div>
-
+            {showDebug && (
+                <div className="fixed top-16 right-4 z-50">
+                    <RoleDebugger />
+                </div>
+            )}
             {/* Icons on the right */}
             <div className="flex items-center gap-4">
                 {/* User Menu Dropdown */}
@@ -131,15 +133,10 @@ const RootLayout = () => {
     };
 
     return (
-
         <div className="flex h-screen bg-gray-50">
             {/* Sidebar */}
             <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
-            {showDebug && (
-                <div className="fixed top-16 right-4 z-50">
-                    <RoleDebugger />
-                </div>
-            )}
+
             {/* Main content - adjusts based on sidebar state */}
             <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
                 <Header toggleSidebar={toggleSidebar} userRole={userRole} signOut={signOut} />
