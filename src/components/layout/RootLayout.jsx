@@ -139,13 +139,10 @@ const RootLayout = () => {
                 <Header toggleSidebar={toggleSidebar} userRole={userRole} signOut={signOut} />
 
                 {showDebug && (
-                    <div className="sticky top-16 z-40 bg-red-100 border-2 border-red-500 p-2 m-2 rounded-md shadow-lg">
-                        {/* This would be your RoleDebugger component, but since it's not defined in the files you've shared,
-                        I've removed the actual component reference */}
-                        <div>Role Debugger Would Show Here</div>
+                    <div className="fixed top-16 right-4 z-50">
+                        <RoleDebugger />
                     </div>
                 )}
-
                 <main className="flex-1 mt-16 p-4 overflow-auto">
                     <Outlet />
                 </main>
