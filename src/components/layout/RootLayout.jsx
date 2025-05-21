@@ -1,5 +1,7 @@
 // src/components/layout/RootLayout.jsx
-import React, { useState } from 'react';
+import React from 'react';
+import { useState, useEffect } from 'react';
+import RoleDebugger from '@/components/RoleDebugger';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import Sidebar from './Sidebar';
@@ -38,6 +40,20 @@ const SimpleButton = ({ children, onClick, className = "", variant = "default" }
         </button>
     );
 };
+const [showDebug, setShowDebug] = useState(false);
+useEffect(() => {
+    const handleKeyDown = (e) => {
+        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+            setShowDebug(prev => !prev);
+        }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+}, []);
 
 // Header Component
 const Header = ({ toggleSidebar, userRole, signOut }) => {
@@ -116,10 +132,15 @@ const RootLayout = () => {
     };
 
     return (
+
         <div className="flex h-screen bg-gray-50">
             {/* Sidebar */}
             <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
-
+            {showDebug && (
+                <div className="fixed top-16 right-4 z-50">
+                    <RoleDebugger />
+                </div>
+            )}
             {/* Main content - adjusts based on sidebar state */}
             <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
                 <Header toggleSidebar={toggleSidebar} userRole={userRole} signOut={signOut} />
