@@ -217,7 +217,87 @@ export function AuthProvider({ children }) {
         isAdmin,
         refreshUserRole
     };
+    window.debugAuth = {
+        // Get current user info
+        getCurrentUser: () => {
+            return auth.currentUser ? {
+                email: auth.currentUser.email,
+                uid: auth.currentUser.uid
+            } : null;
+        },
 
+        // Check admin records in database
+        checkAdminRecords: async () => {
+            try {
+                const adminsRef = ref(database, 'admins');
+                const snapshot = await get(adminsRef);
+                if (snapshot.exists()) {
+                    console.log("Admin records:", snapshot.val());
+                    return snapshot.val();
+                } else {
+                    console.log("No admin records found");
+                    return null;
+                }
+            } catch (error) {
+                console.error("Error checking admin records:", error);
+                return null;
+            }
+        },
+
+        // Fix admin record for current user
+        fixCurrentUserAdmin: async (role = 'admin') => {
+            try {
+                const currentUser = auth.currentUser;
+                if (!currentUser) {
+                    console.error("No user logged in!");
+                    return { success: false, error: "No user logged in" };
+                }
+
+                console.log(`Fixing admin record for ${currentUser.email} (${currentUser.uid})`);
+
+                // Create/update admin record with correct UID
+                const adminRef = ref(database, `admins/${currentUser.uid}`);
+                await set(adminRef, {
+                    email: currentUser.email,
+                    name: currentUser.displayName || currentUser.email.split('@')[0],
+                    role: role,
+                    permissions: {
+                        canManageUsers: role === 'admin',
+                        canManageCategories: true,
+                        canManageLocations: true,
+                        canViewAnalytics: true,
+                        canViewWorkload: true
+                    },
+                    createdAt: new Date().toISOString(),
+                    updatedByFixer: true
+                });
+
+                console.log("Admin record fixed!");
+
+                // Refresh role in AuthProvider
+                if (typeof refreshUserRole === 'function') {
+                    await refreshUserRole();
+                    console.log("User role refreshed in AuthProvider");
+                }
+
+                return { success: true };
+            } catch (error) {
+                console.error("Error fixing admin record:", error);
+                return { success: false, error: error.message };
+            }
+        }
+    };
+
+    // Add refreshUserRole to window for direct console access
+    window.refreshAuthRole = async () => {
+        if (typeof refreshUserRole === 'function') {
+            console.log("Manually refreshing user role");
+            return await refreshUserRole();
+        } else {
+            console.error("refreshUserRole function not available");
+            return { success: false, error: "refreshUserRole function not available" };
+        }
+    };
     return (
         <AuthContext.Provider value={value}>
             {!loading && children}
