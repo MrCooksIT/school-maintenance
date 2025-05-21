@@ -1,7 +1,6 @@
 // src/components/layout/RootLayout.jsx
 import React from 'react';
 import { useState, useEffect } from 'react';
-import RoleDebugger from '@/components/RoleDebugger';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import Sidebar from './Sidebar';
