@@ -1,6 +1,5 @@
 // src/components/layout/RootLayout.jsx
-import React, { useState } from 'react';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import Sidebar from './Sidebar';
@@ -15,7 +14,6 @@ import SimpleDropdown, {
     SimpleDropdownDivider,
     SimpleDropdownLabel
 } from '../ui/SimpleDropdown';
-import RoleDebugger from './RoleDebugger';
 
 // Simple Button Component
 const SimpleButton = ({ children, onClick, className = "", variant = "default" }) => {
@@ -39,19 +37,7 @@ const SimpleButton = ({ children, onClick, className = "", variant = "default" }
         </button>
     );
 };
-const [showDebug, setShowDebug] = useState(false);
-useEffect(() => {
-    const handleKeyDown = (e) => {
-        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-            setShowDebug(prev => !prev);
-        }
-    };
-    window.addEventListener('keydown', handleKeyDown);
 
-    return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-    };
-}, []);
 // Header Component
 const Header = ({ toggleSidebar, userRole, signOut }) => {
     const navigate = useNavigate();
@@ -75,11 +61,7 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
                     <h1 className="text-xl font-semibold">SJMC Maintenance Portal</h1>
                 </div>
             </div>
-            {showDebug && (
-                <div className="fixed top-16 right-4 z-50">
-                    <RoleDebugger />
-                </div>
-            )}
+
             {/* Icons on the right */}
             <div className="flex items-center gap-4">
                 {/* User Menu Dropdown */}
@@ -123,10 +105,25 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
         </div>
     );
 };
-<RoleDebugger />
+
 const RootLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [showDebug, setShowDebug] = useState(false);
     const { userRole, signOut } = useAuth();
+
+    // Debug mode keyboard shortcut
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                setShowDebug(prev => !prev);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
 
     const toggleSidebar = () => {
         setIsSidebarOpen((prev) => !prev);
@@ -141,9 +138,14 @@ const RootLayout = () => {
             <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
                 <Header toggleSidebar={toggleSidebar} userRole={userRole} signOut={signOut} />
 
-                <div className="sticky top-16 z-40 bg-red-100 border-2 border-red-500 p-2 m-2 rounded-md shadow-lg">
-                    <RoleDebugger />
-                </div>
+                {showDebug && (
+                    <div className="sticky top-16 z-40 bg-red-100 border-2 border-red-500 p-2 m-2 rounded-md shadow-lg">
+                        {/* This would be your RoleDebugger component, but since it's not defined in the files you've shared,
+                        I've removed the actual component reference */}
+                        <div>Role Debugger Would Show Here</div>
+                    </div>
+                )}
+
                 <main className="flex-1 mt-16 p-4 overflow-auto">
                     <Outlet />
                 </main>
