@@ -1,6 +1,6 @@
-// src/components/MaintenanceDashboard.jsx - Fixed for persistent closed tickets
-import React, { useState, useEffect } from 'react';
-import { ref, onValue } from 'firebase/database';
+// src/components/MaintenanceDashboard.jsx - Enhanced with reliable auto-refresh
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ref, onValue, get } from 'firebase/database';
 import { database } from '@/config/firebase';
 import TicketDetailsModal from './tickets/TicketDetailsModal';
 import { DateRangePicker } from './DateRangePicker';
@@ -12,6 +12,10 @@ import {
   Search,
   Sliders,
   X,
+  Wifi,
+  WifiOff,
+  Clock,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -55,52 +59,6 @@ const StatusBadge = ({ status }) => {
     </Badge>
   );
 };
-const FirebaseDebugger = () => {
-  const [testValue, setTestValue] = useState(null);
-  const [error, setError] = useState(null);
-
-  const testFirebase = async () => {
-    try {
-      setError(null);
-      // Test write
-      const testRef = ref(database, 'test');
-      await set(testRef, {
-        timestamp: new Date().toISOString(),
-        test: 'This is a test write'
-      });
-
-      // Test read
-      const snapshot = await get(testRef);
-      setTestValue(snapshot.val());
-
-      alert('Firebase test successful!');
-    } catch (err) {
-      console.error('Firebase test error:', err);
-      setError(err.message);
-      alert('Firebase test failed: ' + err.message);
-    }
-  };
-
-  return (
-    <div className="p-4 border rounded-lg bg-gray-50 mb-6">
-      <h3 className="font-bold mb-2">Firebase Debug</h3>
-      <Button onClick={testFirebase}>Test Firebase Connection</Button>
-
-      {testValue && (
-        <div className="mt-2 p-2 bg-green-100 rounded">
-          <p>Test successful! Value:</p>
-          <pre className="text-xs">{JSON.stringify(testValue, null, 2)}</pre>
-        </div>
-      )}
-
-      {error && (
-        <div className="mt-2 p-2 bg-red-100 rounded">
-          <p>Error: {error}</p>
-        </div>
-      )}
-    </div>
-  );
-};
 
 // Priority Badge Component
 const PriorityBadge = ({ priority }) => {
@@ -114,6 +72,49 @@ const PriorityBadge = ({ priority }) => {
     <Badge className={`${priorityStyles[priority] || "bg-gray-100 text-gray-800"} text-xs uppercase`}>
       {priority}
     </Badge>
+  );
+};
+
+// Connection Status Indicator
+const ConnectionStatus = ({ status, lastUpdate, autoRefreshEnabled, onToggleAutoRefresh }) => {
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <div className="flex items-center gap-1">
+        {status === 'connected' ? (
+          <div className="flex items-center gap-1 text-green-600">
+            <Wifi className="h-4 w-4" />
+            <span className="font-medium">Live</span>
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          </div>
+        ) : status === 'connecting' ? (
+          <div className="flex items-center gap-1 text-yellow-600">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            <span>Connecting...</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 text-red-600">
+            <WifiOff className="h-4 w-4" />
+            <span>Offline</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1 text-gray-500">
+        <Clock className="h-3 w-3" />
+        <span className="text-xs">
+          Last: {lastUpdate ? format(lastUpdate, 'HH:mm:ss') : 'Never'}
+        </span>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onToggleAutoRefresh}
+        className={`text-xs px-2 py-1 h-6 ${autoRefreshEnabled ? 'text-green-600 bg-green-50' : 'text-gray-400'}`}
+      >
+        Auto-refresh {autoRefreshEnabled ? 'ON' : 'OFF'}
+      </Button>
+    </div>
   );
 };
 
@@ -169,6 +170,7 @@ const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
 };
 
 const MaintenanceDashboard = () => {
+  // Core state
   const [tickets, setTickets] = useState([]);
   const [filterStatus, setFilterStatus] = useState('open');
   const [commentModalOpen, setCommentModalOpen] = useState(false);
@@ -176,7 +178,14 @@ const MaintenanceDashboard = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [staffMembers, setStaffMembers] = useState([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  const { toast } = useToast();
+
+  // Auto-refresh state
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [newTicketCount, setNewTicketCount] = useState(0);
+
+  // Filter state
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
     to: new Date()
@@ -188,32 +197,238 @@ const MaintenanceDashboard = () => {
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  const handleSync = async () => {
+  // Refs
+  const pollingIntervalRef = useRef(null);
+  const realtimeUnsubscribeRef = useRef(null);
+  const lastTicketCountRef = useRef(0);
+
+  const { toast } = useToast();
+
+  // Force refresh function
+  const forceRefresh = useCallback(async () => {
     setIsSyncing(true);
     try {
-      toast({
-        title: "Syncing Tickets",
-        description: "Please wait while we sync your tickets...",
-        variant: "info",
-      });
+      console.log('Force refreshing tickets...');
+      const ticketsRef = ref(database, 'tickets');
+      const snapshot = await get(ticketsRef);
 
-      // Your actual sync logic here
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulating API call
+      if (snapshot.exists()) {
+        const ticketsData = Object.entries(snapshot.val())
+          .map(([id, value]) => ({ id, ...value }))
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-      toast({
-        title: "Sync Complete",
-        description: "Your tickets have been updated successfully",
-        variant: "success",
-      });
+        setTickets(ticketsData);
+        setConnectionStatus('connected');
+        setLastUpdate(new Date());
+
+        console.log('Force refresh successful:', ticketsData.length, 'tickets');
+
+        toast({
+          title: "Refreshed Successfully",
+          description: `Updated ${ticketsData.length} tickets`,
+          variant: "success",
+        });
+      } else {
+        setTickets([]);
+        console.log('No tickets found in database');
+      }
     } catch (error) {
-      console.error('Error syncing tickets:', error);
+      console.error('Force refresh failed:', error);
+      setConnectionStatus('disconnected');
       toast({
-        title: "Sync Failed",
-        description: "There was an error syncing your tickets",
+        title: "Refresh Failed",
+        description: "Could not update ticket list",
         variant: "destructive",
       });
     } finally {
       setIsSyncing(false);
+    }
+  }, [toast]);
+
+  // Setup Firebase real-time listener
+  useEffect(() => {
+    console.log('Setting up Firebase real-time listener...');
+    const ticketsRef = ref(database, 'tickets');
+
+    const unsubscribe = onValue(
+      ticketsRef,
+      (snapshot) => {
+        try {
+          console.log('Firebase real-time update received');
+          setConnectionStatus('connected');
+          setLastUpdate(new Date());
+
+          if (snapshot.exists()) {
+            const ticketsData = Object.entries(snapshot.val())
+              .map(([id, value]) => ({ id, ...value }))
+              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            console.log('Real-time update - tickets:', ticketsData.length);
+            console.log('Completed tickets:', ticketsData.filter(t => t.status === 'completed').length);
+
+            // Check for new tickets
+            const currentCount = ticketsData.length;
+            const previousCount = lastTicketCountRef.current;
+
+            if (currentCount > previousCount && previousCount > 0) {
+              const newCount = currentCount - previousCount;
+              setNewTicketCount(newCount);
+
+              toast({
+                title: "New Tickets",
+                description: `${newCount} new ticket${newCount > 1 ? 's' : ''} received`,
+                variant: "info",
+              });
+            }
+
+            lastTicketCountRef.current = currentCount;
+            setTickets(ticketsData);
+          } else {
+            console.log('No tickets found');
+            setTickets([]);
+            lastTicketCountRef.current = 0;
+          }
+        } catch (error) {
+          console.error('Error processing Firebase snapshot:', error);
+          setConnectionStatus('disconnected');
+        }
+      },
+      (error) => {
+        console.error('Firebase real-time listener error:', error);
+        setConnectionStatus('disconnected');
+        toast({
+          title: "Connection Lost",
+          description: "Attempting to reconnect...",
+          variant: "destructive",
+        });
+      }
+    );
+
+    realtimeUnsubscribeRef.current = unsubscribe;
+    return () => {
+      if (realtimeUnsubscribeRef.current) {
+        realtimeUnsubscribeRef.current();
+      }
+    };
+  }, [toast]);
+
+  // Setup polling backup
+  useEffect(() => {
+    if (!autoRefreshEnabled) return;
+
+    console.log('Setting up polling backup...');
+    pollingIntervalRef.current = setInterval(async () => {
+      if (connectionStatus === 'disconnected') {
+        console.log('Connection lost - attempting reconnect via polling...');
+        setConnectionStatus('connecting');
+
+        try {
+          const ticketsRef = ref(database, 'tickets');
+          const snapshot = await get(ticketsRef);
+
+          if (snapshot.exists()) {
+            const ticketsData = Object.entries(snapshot.val())
+              .map(([id, value]) => ({ id, ...value }))
+              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            setTickets(ticketsData);
+            setConnectionStatus('connected');
+            setLastUpdate(new Date());
+
+            console.log('Reconnected via polling:', ticketsData.length, 'tickets');
+
+            toast({
+              title: "Reconnected",
+              description: "Connection restored",
+              variant: "success",
+            });
+          }
+        } catch (error) {
+          console.error('Polling failed:', error);
+          setConnectionStatus('disconnected');
+        }
+      } else {
+        // Periodic heartbeat even when connected
+        console.log('Heartbeat check...');
+        setLastUpdate(new Date());
+      }
+    }, 30000); // Every 30 seconds
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, [autoRefreshEnabled, connectionStatus, toast]);
+
+  // Page visibility handling
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log('Page hidden - pausing auto-refresh');
+        setAutoRefreshEnabled(false);
+      } else {
+        console.log('Page visible - resuming auto-refresh and force refreshing');
+        setAutoRefreshEnabled(true);
+        setNewTicketCount(0);
+        // Force refresh when page becomes visible
+        setTimeout(forceRefresh, 500);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [forceRefresh]);
+
+  // Network status monitoring
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('Network back online');
+      setConnectionStatus('connecting');
+      setAutoRefreshEnabled(true);
+      setTimeout(forceRefresh, 1000);
+    };
+
+    const handleOffline = () => {
+      console.log('Network offline');
+      setConnectionStatus('disconnected');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [forceRefresh]);
+
+  // Load staff members
+  useEffect(() => {
+    const staffRef = ref(database, 'staff');
+    const unsubscribe = onValue(staffRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const staffData = Object.entries(snapshot.val()).map(([id, data]) => ({
+          id,
+          ...data,
+        }));
+        setStaffMembers(staffData);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    console.log('Component mounted - performing initial load...');
+    forceRefresh();
+  }, [forceRefresh]);
+
+  const toggleAutoRefresh = () => {
+    setAutoRefreshEnabled(!autoRefreshEnabled);
+    if (!autoRefreshEnabled) {
+      forceRefresh();
     }
   };
 
@@ -229,46 +444,6 @@ const MaintenanceDashboard = () => {
       to: new Date()
     });
   };
-
-  useEffect(() => {
-    const ticketsRef = ref(database, 'tickets');
-    const unsubscribe = onValue(ticketsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const ticketsData = Object.entries(snapshot.val())
-          .map(([id, value]) => ({
-            id,
-            ...value
-          }))
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-        // Log ticket data for debugging
-        console.log('Fetched tickets:', ticketsData.length);
-        console.log('Completed tickets:', ticketsData.filter(t => t.status === 'completed').length);
-
-        setTickets(ticketsData);
-      } else {
-        setTickets([]);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    // Load staff members
-    const staffRef = ref(database, 'staff');
-    const unsubscribe = onValue(staffRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const staffData = Object.entries(snapshot.val()).map(([id, data]) => ({
-          id,
-          ...data,
-        }));
-        setStaffMembers(staffData);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   const filteredTickets = tickets.filter(ticket => {
     // Don't show deleted tickets
@@ -315,12 +490,45 @@ const MaintenanceDashboard = () => {
   const handleTicketClick = (ticket) => {
     setSelectedTicket(ticket);
     setCommentModalOpen(true);
+    setNewTicketCount(0); // Clear new ticket indicator when viewing
   };
 
   return (
     <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
+      {/* Connection status banner */}
+      {connectionStatus === 'disconnected' && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          <span>
+            <strong>Connection Lost:</strong> Auto-refresh is paused. Updates will resume when connection is restored.
+          </span>
+          <Button size="sm" variant="outline" onClick={forceRefresh} className="ml-auto">
+            Try Reconnect
+          </Button>
+        </div>
+      )}
+
       {/* Top section with filters */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
+        {/* Header with connection status */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold">Maintenance Dashboard</h1>
+            {newTicketCount > 0 && (
+              <Badge variant="destructive" className="animate-pulse">
+                {newTicketCount} New
+              </Badge>
+            )}
+          </div>
+
+          <ConnectionStatus
+            status={connectionStatus}
+            lastUpdate={lastUpdate}
+            autoRefreshEnabled={autoRefreshEnabled}
+            onToggleAutoRefresh={toggleAutoRefresh}
+          />
+        </div>
+
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
           {/* Status toggle */}
           <div className="flex gap-2 p-1 bg-gray-100 rounded-lg shadow-inner">
@@ -449,16 +657,16 @@ const MaintenanceDashboard = () => {
             </Popover>
           </div>
 
-          {/* Sync button */}
+          {/* Manual refresh button */}
           <Button
             variant="outline"
             size="sm"
-            onClick={handleSync}
+            onClick={forceRefresh}
             disabled={isSyncing}
             className="whitespace-nowrap"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Syncing...' : 'Sync Tickets'}
+            {isSyncing ? 'Refreshing...' : 'Force Refresh'}
           </Button>
         </div>
       </div>
@@ -470,6 +678,13 @@ const MaintenanceDashboard = () => {
             {filterStatus === 'open' ? 'Open Tickets' : 'Closed Tickets'}
           </h2>
           <Badge variant="secondary">{filteredTickets.length}</Badge>
+
+          {/* Last update info */}
+          {lastUpdate && (
+            <span className="text-xs text-gray-500">
+              Updated {format(lastUpdate, 'HH:mm:ss')}
+            </span>
+          )}
         </div>
 
         {/* Clear filters button - only shown when filters are active */}
