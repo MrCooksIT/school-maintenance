@@ -205,7 +205,7 @@ const PublicTicketForm = () => {
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center justify-center gap-3">
                         <img
-                            src="/school-logo2.png"
+                            src={`${import.meta.env.BASE_URL}school-logo2.png`}
                             alt="Marist St Joseph's Logo"
                             className="h-10 w-auto"
                         />
@@ -336,8 +336,8 @@ const PublicTicketForm = () => {
                                         type="button"
                                         onClick={() => setFormData(prev => ({ ...prev, priority: option.value }))}
                                         className={`p-3 rounded-md border-2 font-medium transition-all ${formData.priority === option.value
-                                                ? option.color + ' border-current'
-                                                : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                                            ? option.color + ' border-current'
+                                            : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
                                             }`}
                                     >
                                         {option.label}
