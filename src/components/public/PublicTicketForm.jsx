@@ -217,7 +217,7 @@ const PublicTicketForm = () => {
                 <div className="text-center mb-8">
                     <div className="flex justify-center mb-4">
                         <img
-                            src="/school-maintenance/public/school-logo2.png"
+                            src={`${import.meta.env.BASE_URL}school-logo2.png`}
                             alt="Marist St Joseph's Logo"
                             className="h-20 w-auto"
                         />
