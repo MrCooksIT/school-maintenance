@@ -11,9 +11,13 @@ const PublicLandingPage = () => {
             <div className="bg-white shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                     <div className="flex items-center gap-3">
-                        <Wrench className="h-8 w-8 text-indigo-600" />
+                        <img
+                            src="/school-logo2.png"
+                            alt="Marist St Joseph's Logo"
+                            className="h-12 w-auto"
+                        />
                         <h1 className="text-2xl font-bold text-gray-900">
-                            School Maintenance Portal
+                            Maintenance Portal
                         </h1>
                     </div>
                 </div>
@@ -26,7 +30,7 @@ const PublicLandingPage = () => {
                         Report Maintenance Issues Quickly
                     </h2>
                     <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                        Help us keep our school facilities in top condition by reporting any maintenance issues you encounter
+                        Help us keep Marist St Joseph's facilities in top condition by reporting any maintenance issues you encounter
                     </p>
                 </div>
 

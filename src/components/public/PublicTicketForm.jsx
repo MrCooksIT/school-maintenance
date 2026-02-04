@@ -463,7 +463,7 @@ const PublicTicketForm = () => {
 
                 {/* Footer Info */}
                 <div className="mt-6 text-center text-sm text-gray-600">
-                    <p>Need help? Contact the maintenance team directly at maintenance@maristsj.co.za</p>
+                    <p>Need help? Contact the website administrator directly at acoetzee@maristsj.co.za</p>
                 </div>
             </div>
         </div>

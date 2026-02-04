@@ -1,4 +1,5 @@
 // src/components/tickets/TicketDetailsModal.jsx
+import { prepareTicketUpdate } from '@/utils/ticketStatusAutomation';
 import React, { useState, useEffect } from 'react';
 import PauseReasonModal from './PauseReasonModal';
 import { ref, update, onValue, push } from 'firebase/database';
@@ -187,26 +188,32 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
 
   const handleQuickUpdate = async (field, value) => {
     if (!ticket || isCompleted) return; // Prevent updates if ticket is completed
+
     try {
-      const updateData = {
-        [field]: value,
-        lastUpdated: new Date().toISOString()
+      // Prepare the base update
+      const baseUpdate = {
+        [field]: value
       };
 
-      // Special case for assignment changes - we need to ensure the Google Apps Script can detect the change
-      if (field === 'assignedTo') {
-        // Reset the assignmentNotified flag to ensure the notification is sent
-        // Do NOT set skipEmailNotification flag for assignments
-        updateData.assignmentNotified = null;
-      }
+      // Use the automation utility to determine if status should change
+      const updateData = prepareTicketUpdate(baseUpdate, ticket);
 
+      // Update Firebase
       const ticketRef = ref(database, `tickets/${ticket.id}`);
       await update(ticketRef, updateData);
-      setEditedData(prev => ({ ...prev, [field]: value }));
+
+      // Update local state with all changes
+      setEditedData(prev => ({ ...prev, ...updateData }));
+
+      // Show appropriate success message
+      let description = `The ticket ${field} has been updated.`;
+      if (updateData.autoStatusUpdate && field === 'assignedTo') {
+        description = `Ticket assigned and status automatically changed to "${updateData.status}".`;
+      }
 
       toast({
         title: "Update Successful",
-        description: `The ticket ${field} has been updated.`,
+        description: description,
         variant: "success"
       });
     } catch (error) {
