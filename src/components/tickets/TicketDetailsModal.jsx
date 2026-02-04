@@ -1,5 +1,5 @@
 // src/components/tickets/TicketDetailsModal.jsx
-import { prepareTicketUpdate } from '@/utils/ticketStatusAutomation';
+import { prepareTicketUpdate } from '@/utils/components/ticketStatusAutomation';
 import React, { useState, useEffect } from 'react';
 import PauseReasonModal from './PauseReasonModal';
 import { ref, update, onValue, push } from 'firebase/database';
