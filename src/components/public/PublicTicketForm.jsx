@@ -1,3 +1,4 @@
+// src/components/public/PublicTicketForm.jsx
 import React, { useState, useEffect } from 'react';
 import { database } from '../../config/firebase';
 import { ref, push, get } from 'firebase/database';
@@ -137,6 +138,12 @@ const PublicTicketForm = () => {
             return false;
         }
 
+        // Validate Marist St Joseph's email domain
+        if (!formData.reporterEmail.toLowerCase().endsWith('@maristsj.co.za')) {
+            setErrorMessage('Please use your Marist St Joseph\'s email address (@maristsj.co.za)');
+            return false;
+        }
+
         return true;
     };
 
@@ -209,12 +216,14 @@ const PublicTicketForm = () => {
                 {/* Header */}
                 <div className="text-center mb-8">
                     <div className="flex justify-center mb-4">
-                        <div className="p-3 bg-indigo-600 rounded-full">
-                            <FileText className="h-8 w-8 text-white" />
-                        </div>
+                        <img
+                            src="/school-maintenance/public/school-logo2.png"
+                            alt="Marist St Joseph's Logo"
+                            className="h-20 w-auto"
+                        />
                     </div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                        Submit Maintenance Request
+                        Maintenance Request
                     </h1>
                     <p className="text-gray-600">
                         Report a maintenance issue and we'll get it fixed as soon as possible
@@ -334,8 +343,8 @@ const PublicTicketForm = () => {
                                         type="button"
                                         onClick={() => setFormData(prev => ({ ...prev, priority: option.value }))}
                                         className={`p-3 rounded-lg border-2 transition-all ${formData.priority === option.value
-                                                ? 'border-indigo-500 bg-indigo-50'
-                                                : 'border-gray-200 hover:border-gray-300'
+                                            ? 'border-indigo-500 bg-indigo-50'
+                                            : 'border-gray-200 hover:border-gray-300'
                                             }`}
                                     >
                                         <span className={`font-medium ${option.color}`}>
@@ -401,7 +410,7 @@ const PublicTicketForm = () => {
                                         name="reportedBy"
                                         value={formData.reportedBy}
                                         onChange={handleChange}
-                                        placeholder="John Doe"
+                                        placeholder="Jane Doe"
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                         required
                                     />
@@ -417,10 +426,11 @@ const PublicTicketForm = () => {
                                         name="reporterEmail"
                                         value={formData.reporterEmail}
                                         onChange={handleChange}
-                                        placeholder="john.doe@school.com"
+                                        placeholder="yourname@maristsj.co.za"
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                         required
                                     />
+                                    <p className="text-xs text-gray-500 mt-1">Please use your Marist email</p>
                                 </div>
 
                                 {/* Phone (Optional) */}
@@ -462,7 +472,7 @@ const PublicTicketForm = () => {
 
                 {/* Footer Info */}
                 <div className="mt-8 text-center text-sm text-gray-600">
-                    <p>Need help? Contact the maintenance team directly at maintenance@school.com</p>
+                    <p>Need help? Contact the website admin directly at acoetzee@maristsj.co.za</p>
                 </div>
             </div>
         </div>
