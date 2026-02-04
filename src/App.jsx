@@ -1,4 +1,3 @@
-// App.jsx with fully simplified routing structure
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './components/auth/AuthProvider';
@@ -17,6 +16,7 @@ import CategoriesPage from './components/admin/CategoriesPage';
 import AdminRoleManager from './components/admin/AdminRoleManager';
 import PageNotFound from './components/PageNotFound';
 import ReopenRequestsManager from './components/admin/ReopenRequestsManager';
+import PublicTicketForm from './components/public/PublicTicketForm';
 
 
 function App() {
@@ -25,6 +25,7 @@ function App() {
       <AuthProvider>
         <Routes>
           {/* Public routes */}
+          <Route path="/submit-ticket" element={<PublicTicketForm />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin/login" element={<AdminLogin />} />
 

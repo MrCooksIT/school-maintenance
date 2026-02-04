@@ -1,4 +1,3 @@
-// src/components/auth/AuthProvider.jsx - Comprehensive fix
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth, database } from '../../config/firebase';
 import { ref, get, set, update, onValue } from 'firebase/database';
@@ -10,7 +9,12 @@ import {
 } from 'firebase/auth';
 
 const AuthContext = createContext({});
-
+//List of public routes
+const PUBLIC_ROUTES = [
+    '/submit-ticket',
+    '/login',
+    '/admin/login'
+];
 // List of admin-only routes
 const ADMIN_ROUTES = [
     '/admin/analytics',
@@ -24,6 +28,7 @@ const ADMIN_ROUTES = [
 const FULL_ADMIN_ROUTES = [
     '/admin/roles'
 ];
+const DEFAULT_ADMIN_EMAIL = 'acoetzee@maristsj.co.za';
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
@@ -32,7 +37,7 @@ export function AuthProvider({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Add debug logging for role changes
+
     useEffect(() => {
         console.log("User role changed:", userRole);
     }, [userRole]);
@@ -42,6 +47,10 @@ export function AuthProvider({ children }) {
         // Skip during loading
         if (loading) return;
 
+
+        if (PUBLIC_ROUTES.includes(location.pathname)) {
+            return;
+        }
         // If the user is not logged in and not on login page, redirect to login
         if (!user && !['/login', '/admin/login'].includes(location.pathname)) {
             navigate('/login', { replace: true });
