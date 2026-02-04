@@ -1,4 +1,3 @@
-// src/utils/ticketStatusAutomation.js
 // Utility to automatically update ticket status based on assignment
 
 /**
