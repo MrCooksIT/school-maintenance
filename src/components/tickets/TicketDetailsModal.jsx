@@ -195,6 +195,11 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
         [field]: value
       };
 
+      // When assigning a ticket, record who made the assignment
+      if (field === 'assignedTo' && value) {
+        baseUpdate.assignedBy = user?.uid || null;
+      }
+
       // Use the automation utility to determine if status should change
       const updateData = prepareTicketUpdate(baseUpdate, ticket);
 
@@ -838,6 +843,11 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                           ))}
                         </SelectContent>
                       </Select>
+                    )}
+                    {editedData.assignedBy && (
+                      <div className="mt-2 text-xs text-blue-200">
+                        Assigned by: {staffMembers?.find(s => s.id === editedData.assignedBy)?.name || 'Unknown'}
+                      </div>
                     )}
                   </div>
 
