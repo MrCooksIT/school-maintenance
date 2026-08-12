@@ -21,7 +21,13 @@ const ADMIN_ROUTES = [
     '/admin/workload',
     '/admin/locations',
     '/admin/categories',
-    '/admin/team'
+    '/admin/team',
+    '/admin/access',
+    // Booking admin. /bookings and /bookings/mine stay open to all staff, and
+    // /bookings/approvals is open because approvers are not necessarily admins.
+    '/bookings/all',
+    '/bookings/assets',
+    '/bookings/approvers'
 ];
 
 // List of full-admin-only routes
@@ -29,11 +35,44 @@ const FULL_ADMIN_ROUTES = [
     '/admin/roles'
 ];
 const DEFAULT_ADMIN_EMAIL = 'acoetzee@maristsj.co.za';
+const ALLOWED_EMAIL_DOMAIN = '@maristsj.co.za';
+
+/**
+ * Record this account under users/{uid} on sign-in.
+ *
+ * staff/ and admins/ are keyed by push id, so there is no way to look a person
+ * up by their Firebase uid - which is what the security rules match on. This
+ * gives the booking system a uid-keyed directory so approvers can be assigned
+ * by name instead of by pasting raw uids. Best effort: never block sign-in.
+ */
+async function registerUserDirectoryEntry(authUser) {
+    if (!authUser?.email?.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) return;
+    try {
+        await update(ref(database, `users/${authUser.uid}`), {
+            email: authUser.email,
+            name: authUser.displayName || authUser.email,
+            photoURL: authUser.photoURL || null,
+            lastSeen: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Could not record user directory entry:', error);
+    }
+}
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [userRole, setUserRole] = useState(null);
+    // Whether a record exists at admins/{uid} specifically. userRole can also come
+    // from the staff node, but the security rules only ever check admins/{uid} -
+    // so this is what the booking UI must gate on to avoid showing buttons that
+    // the database will refuse.
+    const [isDatabaseAdmin, setIsDatabaseAdmin] = useState(false);
+    // Whether this person may see the maintenance portal at all. Ordinary
+    // teachers sign in only to book rooms and vehicles, and must not see the
+    // ticket system. Backed by maintenanceStaff/{uid}, which is uid-keyed
+    // because staff/ is keyed by push id and rules can only match on auth.uid.
+    const [isMaintenanceUser, setIsMaintenanceUser] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -63,6 +102,19 @@ export function AuthProvider({ children }) {
             return;
         }
 
+        // Ordinary teachers only get the booking side of the app. Everything
+        // under /admin and the ticket dashboard at / belongs to maintenance.
+        if (user && !(isDatabaseAdmin || isMaintenanceUser)) {
+            const isMaintenanceArea =
+                location.pathname === '/' ||
+                (location.pathname.startsWith('/admin') && !location.pathname.startsWith('/admin/login'));
+
+            if (isMaintenanceArea) {
+                navigate('/bookings', { replace: true });
+                return;
+            }
+        }
+
         // Check admin route access
         if (user && ADMIN_ROUTES.some(route => location.pathname.startsWith(route))) {
             if (userRole !== 'admin' && userRole !== 'supervisor') {
@@ -80,7 +132,7 @@ export function AuthProvider({ children }) {
                 return;
             }
         }
-    }, [user, loading, userRole, location.pathname, navigate]);
+    }, [user, loading, userRole, isDatabaseAdmin, isMaintenanceUser, location.pathname, navigate]);
 
     // Function to manually fetch and update user role
     const fetchAndUpdateUserRole = async (userId) => {
@@ -133,6 +185,7 @@ export function AuthProvider({ children }) {
         // Listen for admin role changes
         const adminRef = ref(database, `admins/${user.uid}`);
         const unsubscribeAdmin = onValue(adminRef, (snapshot) => {
+            setIsDatabaseAdmin(snapshot.exists());
             if (snapshot.exists()) {
                 const adminData = snapshot.val();
                 console.log("Admin role change detected for", user.email, "- new role:", adminData.role);
@@ -158,9 +211,19 @@ export function AuthProvider({ children }) {
             console.error("Error in admin role listener:", error);
         });
 
+        // Maintenance portal access, tracked separately from booking roles.
+        const maintenanceRef = ref(database, `maintenanceStaff/${user.uid}`);
+        const unsubscribeMaintenance = onValue(maintenanceRef, (snapshot) => {
+            setIsMaintenanceUser(snapshot.exists() && snapshot.val() !== false);
+        }, (error) => {
+            console.error("Error in maintenance access listener:", error);
+            setIsMaintenanceUser(false);
+        });
+
         return () => {
             console.log("Cleaning up role listeners");
             unsubscribeAdmin();
+            unsubscribeMaintenance();
         };
     }, [user]);
 
@@ -172,8 +235,11 @@ export function AuthProvider({ children }) {
 
             if (authUser) {
                 // Do not set role here, it will be set by the real-time listener
+                registerUserDirectoryEntry(authUser);
             } else {
                 setUserRole(null);
+                setIsDatabaseAdmin(false);
+                setIsMaintenanceUser(false);
             }
 
             setLoading(false);
@@ -192,10 +258,21 @@ export function AuthProvider({ children }) {
 
     const signIn = async () => {
         const provider = new GoogleAuthProvider();
+        // Nudges the Google chooser towards school accounts. This is a hint only -
+        // the security rules are what actually enforce the domain.
+        provider.setCustomParameters({ hd: 'maristsj.co.za' });
+
         try {
             console.log("Starting Google sign in...");
             const result = await signInWithPopup(auth, provider);
+
+            if (!result.user.email?.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) {
+                await firebaseSignOut(auth);
+                throw new Error(`Please sign in with your school account (${ALLOWED_EMAIL_DOMAIN}).`);
+            }
+
             console.log("Sign in successful for:", result.user.email);
+            await registerUserDirectoryEntry(result.user);
 
             // Role will be set by the real-time listener
             return result.user;
@@ -224,6 +301,9 @@ export function AuthProvider({ children }) {
         signOut,
         userRole,
         isAdmin,
+        isDatabaseAdmin,
+        isMaintenanceUser,
+        canSeeMaintenance: isDatabaseAdmin || isMaintenanceUser,
         refreshUserRole
     };
 

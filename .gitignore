@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Environment files (WhatsApp config etc.) - keep .env.example
+.env
+functions/.env
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

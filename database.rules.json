@@ -1,0 +1,115 @@
+{
+  "rules": {
+    "maintenanceStaff": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".validate": "newData.isBoolean()"
+      }
+    },
+
+    "tickets": {
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za') && (root.child('admins').child(auth.uid).exists() || root.child('maintenanceStaff').child(auth.uid).exists())",
+      ".indexOn": ["status", "assignedTo", "createdAt"],
+      "$ticketId": {
+        ".write": "(auth != null && auth.token.email.endsWith('@maristsj.co.za')) || !data.exists()",
+        ".validate": "auth != null || (newData.hasChildren(['title', 'description', 'reportedBy', 'reporterEmail', 'status']) && newData.child('status').val() === 'pending' && newData.child('reporterEmail').val().endsWith('@maristsj.co.za'))"
+      }
+    },
+    "staff": {
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za') && (root.child('admins').child(auth.uid).exists() || root.child('maintenanceStaff').child(auth.uid).exists())",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "admins": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+    "categories": {
+      ".read": true,
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "locations": {
+      ".read": true,
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+    },
+    "notifications": {
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+      ".write": "auth != null && auth.token.email.endsWith('@maristsj.co.za')"
+    },
+    "ticketCounter": {
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+      ".write": "auth != null && auth.token.email.endsWith('@maristsj.co.za')"
+    },
+
+    "users": {
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid && auth.token.email.endsWith('@maristsj.co.za')",
+        ".validate": "newData.hasChildren(['email']) && newData.child('email').val() === auth.token.email"
+      }
+    },
+
+    "assets": {
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+      ".indexOn": ["type", "status"],
+      "$assetId": {
+        ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+        ".validate": "newData.hasChildren(['name', 'type', 'approvalMode', 'status'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
+        },
+        "type": {
+          ".validate": "newData.val() === 'room' || newData.val() === 'vehicle' || newData.val() === 'equipment'"
+        },
+        "approvalMode": {
+          ".validate": "newData.val() === 'auto' || newData.val() === 'signoff'"
+        },
+        "status": {
+          ".validate": "newData.val() === 'active' || newData.val() === 'retired'"
+        },
+        "approvers": {
+          "$uid": { ".validate": "newData.isBoolean()" }
+        },
+        "$other": { ".validate": true }
+      }
+    },
+
+    "bookingApprovers": {
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": { ".validate": "newData.isBoolean() || newData.hasChildren(['name'])" }
+    },
+
+    "bookings": {
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+      ".indexOn": ["assetId", "start", "status", "requesterUid"],
+      "$bookingId": {
+        ".write": "auth != null && auth.token.email.endsWith('@maristsj.co.za') && (!data.exists() ? newData.child('requester/uid').val() === auth.uid : (data.child('requester/uid').val() === auth.uid || root.child('admins').child(auth.uid).exists() || root.child('bookingApprovers').child(auth.uid).exists() || root.child('assets').child(data.child('assetId').val()).child('approvers').child(auth.uid).exists()))",
+
+        ".validate": "newData.hasChildren(['assetId', 'start', 'end', 'status', 'requester']) && newData.child('end').val() > newData.child('start').val() && root.child('assets').child(newData.child('assetId').val()).exists() && (root.child('admins').child(auth.uid).exists() || root.child('bookingApprovers').child(auth.uid).exists() || root.child('assets').child(newData.child('assetId').val()).child('approvers').child(auth.uid).exists() ? true : (!data.exists() ? newData.child('status').val() === (root.child('assets').child(newData.child('assetId').val()).child('approvalMode').val() === 'auto' ? 'confirmed' : 'pending') : (newData.child('status').val() === 'cancelled' || (newData.child('status').val() === data.child('status').val() && root.child('assets').child(newData.child('assetId').val()).child('approvalMode').val() === 'auto'))))",
+
+        "status": {
+          ".validate": "newData.val() === 'pending' || newData.val() === 'confirmed' || newData.val() === 'declined' || newData.val() === 'cancelled'"
+        },
+        "start": { ".validate": "newData.isNumber()" },
+        "end": { ".validate": "newData.isNumber()" },
+        "requesterUid": { ".validate": "newData.val() === newData.parent().child('requester').child('uid').val()" },
+        "$other": { ".validate": true }
+      }
+    },
+
+    "bookingSlots": {
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+      "$assetId": {
+        "$slotKey": {
+          ".write": "auth != null && auth.token.email.endsWith('@maristsj.co.za') && (!data.exists() || root.child('bookings').child(data.val()).child('requester').child('uid').val() === auth.uid || root.child('admins').child(auth.uid).exists() || root.child('bookingApprovers').child(auth.uid).exists() || root.child('assets').child($assetId).child('approvers').child(auth.uid).exists())",
+          ".validate": "!newData.exists() || newData.isString()"
+        }
+      }
+    }
+  }
+}

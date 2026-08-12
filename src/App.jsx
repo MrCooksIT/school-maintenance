@@ -1,6 +1,6 @@
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './components/auth/AuthProvider';
+import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import MaintenanceDashboard from './components/MaintenanceDashboard';
 import Login from './components/auth/Login';
 import AdminLogin from './components/auth/AdminLogin';
@@ -17,7 +17,26 @@ import AdminRoleManager from './components/admin/AdminRoleManager';
 import PageNotFound from './components/PageNotFound';
 import ReopenRequestsManager from './components/admin/ReopenRequestsManager';
 import PublicTicketForm from './components/public/PublicTicketForm';
+import BookingCalendar from './components/bookings/BookingCalendar';
+import MyBookings from './components/bookings/MyBookings';
+import ApprovalsQueue from './components/bookings/ApprovalsQueue';
+import BookingsDashboard from './components/bookings/BookingsDashboard';
+import AssetsManager from './components/bookings/AssetsManager';
+import ApproversManager from './components/bookings/ApproversManager';
+import PortalAccessManager from './components/admin/PortalAccessManager';
+import { Toaster } from './components/Toaster';
 
+
+/**
+ * The landing page depends on who you are: maintenance staff and admins get the
+ * ticket dashboard, everyone else goes straight to bookings. Decided here rather
+ * than only in the route guard so the dashboard never mounts (and never fires a
+ * denied tickets read) for a teacher.
+ */
+function Home() {
+  const { canSeeMaintenance } = useAuth();
+  return canSeeMaintenance ? <MaintenanceDashboard /> : <Navigate to="/bookings" replace />;
+}
 
 function App() {
   return (
@@ -35,8 +54,8 @@ function App() {
               <RootLayout />
             </ProtectedRoute>
           }>
-            {/* Dashboard */}
-            <Route index element={<MaintenanceDashboard />} />
+            {/* Dashboard - or a redirect to bookings for non-maintenance staff */}
+            <Route index element={<Home />} />
 
             {/* All admin routes - access control is handled by the sidebar visibility */}
             <Route path="admin/jobs" element={<Jobs />} />
@@ -48,11 +67,24 @@ function App() {
             <Route path="admin/team" element={<Team />} />
             <Route path="admin/roles" element={<AdminRoleManager />} />
             <Route path="admin/reopen-requests" element={<ReopenRequestsManager />} />
+            <Route path="admin/access" element={<PortalAccessManager />} />
+
+            {/* Bookings - rooms, vehicles and equipment */}
+            <Route path="bookings" element={<BookingCalendar />} />
+            <Route path="bookings/mine" element={<MyBookings />} />
+            <Route path="bookings/approvals" element={<ApprovalsQueue />} />
+            <Route path="bookings/all" element={<BookingsDashboard />} />
+            <Route path="bookings/assets" element={<AssetsManager />} />
+            <Route path="bookings/approvers" element={<ApproversManager />} />
 
             {/* Fallback */}
             <Route path="*" element={<PageNotFound />} />
           </Route>
         </Routes>
+
+        {/* Renders the toasts that useToast() queues. Without this mounted,
+            every toast() call in the app is silently swallowed. */}
+        <Toaster />
       </AuthProvider>
     </Router>
   );
