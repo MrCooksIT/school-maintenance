@@ -22,6 +22,7 @@ const ADMIN_ROUTES = [
     '/admin/locations',
     '/admin/categories',
     '/admin/team',
+    '/admin/access',
     // Booking admin. /bookings and /bookings/mine stay open to all staff, and
     // /bookings/approvals is open because approvers are not necessarily admins.
     '/bookings/all',
@@ -67,6 +68,11 @@ export function AuthProvider({ children }) {
     // so this is what the booking UI must gate on to avoid showing buttons that
     // the database will refuse.
     const [isDatabaseAdmin, setIsDatabaseAdmin] = useState(false);
+    // Whether this person may see the maintenance portal at all. Ordinary
+    // teachers sign in only to book rooms and vehicles, and must not see the
+    // ticket system. Backed by maintenanceStaff/{uid}, which is uid-keyed
+    // because staff/ is keyed by push id and rules can only match on auth.uid.
+    const [isMaintenanceUser, setIsMaintenanceUser] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -96,6 +102,19 @@ export function AuthProvider({ children }) {
             return;
         }
 
+        // Ordinary teachers only get the booking side of the app. Everything
+        // under /admin and the ticket dashboard at / belongs to maintenance.
+        if (user && !(isDatabaseAdmin || isMaintenanceUser)) {
+            const isMaintenanceArea =
+                location.pathname === '/' ||
+                (location.pathname.startsWith('/admin') && !location.pathname.startsWith('/admin/login'));
+
+            if (isMaintenanceArea) {
+                navigate('/bookings', { replace: true });
+                return;
+            }
+        }
+
         // Check admin route access
         if (user && ADMIN_ROUTES.some(route => location.pathname.startsWith(route))) {
             if (userRole !== 'admin' && userRole !== 'supervisor') {
@@ -113,7 +132,7 @@ export function AuthProvider({ children }) {
                 return;
             }
         }
-    }, [user, loading, userRole, location.pathname, navigate]);
+    }, [user, loading, userRole, isDatabaseAdmin, isMaintenanceUser, location.pathname, navigate]);
 
     // Function to manually fetch and update user role
     const fetchAndUpdateUserRole = async (userId) => {
@@ -192,9 +211,19 @@ export function AuthProvider({ children }) {
             console.error("Error in admin role listener:", error);
         });
 
+        // Maintenance portal access, tracked separately from booking roles.
+        const maintenanceRef = ref(database, `maintenanceStaff/${user.uid}`);
+        const unsubscribeMaintenance = onValue(maintenanceRef, (snapshot) => {
+            setIsMaintenanceUser(snapshot.exists() && snapshot.val() !== false);
+        }, (error) => {
+            console.error("Error in maintenance access listener:", error);
+            setIsMaintenanceUser(false);
+        });
+
         return () => {
             console.log("Cleaning up role listeners");
             unsubscribeAdmin();
+            unsubscribeMaintenance();
         };
     }, [user]);
 
@@ -210,6 +239,7 @@ export function AuthProvider({ children }) {
             } else {
                 setUserRole(null);
                 setIsDatabaseAdmin(false);
+                setIsMaintenanceUser(false);
             }
 
             setLoading(false);
@@ -272,6 +302,8 @@ export function AuthProvider({ children }) {
         userRole,
         isAdmin,
         isDatabaseAdmin,
+        isMaintenanceUser,
+        canSeeMaintenance: isDatabaseAdmin || isMaintenanceUser,
         refreshUserRole
     };
 

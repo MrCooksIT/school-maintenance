@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import PendingApprovalsBadge from '../bookings/PendingApprovalsBadge';
+import { useAssets, useGlobalApprovers } from '../bookings/useBookingData';
 import {
     LayoutDashboard,
     ClipboardList,
@@ -28,12 +29,20 @@ import {
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const location = useLocation();
-    const { userRole } = useAuth();
+    const { userRole, user, isDatabaseAdmin, canSeeMaintenance } = useAuth();
+    const { assets } = useAssets();
+    const { approvers: globalApprovers } = useGlobalApprovers();
     const [adminExpanded, setAdminExpanded] = useState(false);
 
     const isActiveRoute = (path) => location.pathname === path;
     const isAdmin = userRole === 'admin' || userRole === 'supervisor';
     const isFullAdmin = userRole === 'admin';
+
+    // Show Approvals only to people who can actually approve something, rather
+    // than sending every teacher to an empty queue.
+    const isApprover = isDatabaseAdmin
+        || !!globalApprovers?.[user?.uid]
+        || assets.some((asset) => asset.approvers?.[user?.uid]);
 
     // General routes accessible to all authenticated users
     const generalRoutes = [
@@ -46,12 +55,12 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     const bookingRoutes = [
         { name: 'Book an asset', icon: <CalendarPlus className="h-5 w-5" />, path: '/bookings' },
         { name: 'My bookings', icon: <CalendarCheck className="h-5 w-5" />, path: '/bookings/mine' },
-        {
+        ...(isApprover ? [{
             name: 'Approvals',
             icon: <ShieldCheck className="h-5 w-5" />,
             path: '/bookings/approvals',
             badge: <PendingApprovalsBadge />
-        },
+        }] : []),
     ];
 
     // Admin-only routes
@@ -70,6 +79,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Locations', icon: <MapPin className="h-5 w-5" />, path: '/admin/locations' },
         { name: 'Categories', icon: <FolderOpen className="h-5 w-5" />, path: '/admin/categories' },
         { name: 'Team', icon: <Users className="h-5 w-5" />, path: '/admin/team' },
+        { name: 'Portal access', icon: <Wrench className="h-5 w-5" />, path: '/admin/access' },
     ];
 
     // Full admin only routes
@@ -89,8 +99,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         >
             <div className="p-4 flex justify-between items-center">
                 <h1 className="text-white text-2xl font-bold flex items-center gap-2">
-                    <Wrench className="w-6 h-6" />
-                    <span className="text-lg">Maintenance</span>
+                    {canSeeMaintenance ? <Wrench className="w-6 h-6" /> : <CalendarPlus className="w-6 h-6" />}
+                    <span className="text-lg">{canSeeMaintenance ? 'Maintenance' : 'Bookings'}</span>
                 </h1>
                 <button
                     onClick={toggleSidebar}
@@ -101,7 +111,8 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             </div>
 
             <nav className="flex-1 px-2 py-4">
-                {/* Standard Menu Items */}
+                {/* Maintenance portal - hidden from staff who only book assets */}
+                {canSeeMaintenance && (
                 <div className="mb-4">
                     {generalRoutes.map((item) => (
                         <Link
@@ -117,6 +128,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         </Link>
                     ))}
                 </div>
+                )}
 
                 {/* Bookings - rooms, vehicles and equipment */}
                 <div className="mb-4">

@@ -339,6 +339,58 @@ async function run() {
         await assertFails(set(ref(asPerson(PEOPLE.teacher), 'bookingApprovers/t1'), true));
     });
 
+    describe('Maintenance portal isolation');
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.database();
+        await set(ref(db, 'tickets/t-existing'), {
+            title: 'Broken projector', description: 'Room 12', status: 'pending',
+            reportedBy: 'Someone', reporterEmail: 'someone@maristsj.co.za'
+        });
+        await set(ref(db, 'staff/-NpushId'), { name: 'Groundsman', email: 'grounds@maristsj.co.za' });
+        await set(ref(db, 'maintenanceStaff/mt1'), true);
+    });
+    const maintenanceTech = { uid: 'mt1', email: 'tech@maristsj.co.za', name: 'Maintenance Tech' };
+
+    await it('an ordinary teacher CANNOT read tickets', async () => {
+        await assertFails(get(ref(asPerson(PEOPLE.teacher), 'tickets')));
+    });
+    await it('an ordinary teacher cannot read a single ticket either', async () => {
+        await assertFails(get(ref(asPerson(PEOPLE.teacher), 'tickets/t-existing')));
+    });
+    await it('an ordinary teacher cannot read the staff list', async () => {
+        await assertFails(get(ref(asPerson(PEOPLE.teacher), 'staff')));
+    });
+    await it('a granted maintenance user CAN read tickets', async () => {
+        await assertSucceeds(get(ref(asPerson(maintenanceTech), 'tickets')));
+    });
+    await it('an admin can still read tickets', async () => {
+        await assertSucceeds(get(ref(asPerson(PEOPLE.admin), 'tickets')));
+    });
+    await it('a teacher can still book - isolation did not break bookings', async () => {
+        const { updates } = bookingWrite({
+            bookingId: 'iso1', assetId: 'room1', assetName: 'Meeting Room 1',
+            start: AT(14), end: AT(15), person: PEOPLE.teacher, status: 'confirmed'
+        });
+        await assertSucceeds(update(ref(asPerson(PEOPLE.teacher)), updates));
+    });
+    await it('a teacher cannot grant themselves maintenance access', async () => {
+        await assertFails(set(ref(asPerson(PEOPLE.teacher), 'maintenanceStaff/t1'), true));
+    });
+    await it('an admin can grant maintenance access', async () => {
+        await assertSucceeds(set(ref(asPerson(PEOPLE.admin), 'maintenanceStaff/t2'), true));
+    });
+    await it('a teacher can check their own access flag', async () => {
+        await assertSucceeds(get(ref(asPerson(PEOPLE.teacher), 'maintenanceStaff/t1')));
+    });
+    await it('the public ticket form can still submit unauthenticated', async () => {
+        const anon = testEnv.unauthenticatedContext().database();
+        await assertSucceeds(set(ref(anon, 'tickets/t-public'), {
+            title: 'Leaking tap', description: 'Staff room', status: 'pending',
+            reportedBy: 'A Teacher', reporterEmail: 'teacher.one@maristsj.co.za'
+        }));
+    });
+
     describe('User directory');
     await seed();
     await it('a user can register themselves', async () => {

@@ -168,18 +168,3 @@ export function useUsers() {
     return { users, loading };
 }
 
-/** Staff records, used to pick approvers by name rather than by raw UID. */
-export function useStaff() {
-    const [staff, setStaff] = useState([]);
-
-    useEffect(() => {
-        const unsubscribe = onValue(
-            ref(database, 'staff'),
-            (snapshot) => setStaff(toList(snapshot).sort((a, b) => (a.name || '').localeCompare(b.name || ''))),
-            (err) => console.error('Error loading staff:', err)
-        );
-        return () => unsubscribe();
-    }, []);
-
-    return staff;
-}

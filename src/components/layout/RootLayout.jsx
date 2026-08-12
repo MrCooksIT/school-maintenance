@@ -1,5 +1,5 @@
 // src/components/layout/RootLayout.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import Sidebar from './Sidebar';
@@ -39,7 +39,7 @@ const SimpleButton = ({ children, onClick, className = "", variant = "default" }
 };
 
 // Header Component
-const Header = ({ toggleSidebar, userRole, signOut }) => {
+const Header = ({ toggleSidebar, userRole, signOut, canSeeMaintenance }) => {
     const navigate = useNavigate();
     const isAdmin = userRole === 'admin' || userRole === 'supervisor';
 
@@ -58,7 +58,9 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
             <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4">
                 <img src="/school-maintenance/school-logo2.png" alt="SJMC Logo" className="h-12" />
                 <div className="hidden md:block text-center">
-                    <h1 className="text-xl font-semibold">SJMC Maintenance Portal</h1>
+                    <h1 className="text-xl font-semibold">
+                        {canSeeMaintenance ? 'SJMC Maintenance Portal' : 'SJMC Bookings'}
+                    </h1>
                 </div>
             </div>
 
@@ -108,22 +110,7 @@ const Header = ({ toggleSidebar, userRole, signOut }) => {
 
 const RootLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [showDebug, setShowDebug] = useState(false);
-    const { userRole, signOut } = useAuth();
-
-    // Debug mode keyboard shortcut
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-                setShowDebug(prev => !prev);
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown);
-        };
-    }, []);
+    const { userRole, signOut, canSeeMaintenance } = useAuth();
 
     const toggleSidebar = () => {
         setIsSidebarOpen((prev) => !prev);
@@ -136,13 +123,13 @@ const RootLayout = () => {
 
             {/* Main content - adjusts based on sidebar state */}
             <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
-                <Header toggleSidebar={toggleSidebar} userRole={userRole} signOut={signOut} />
+                <Header
+                    toggleSidebar={toggleSidebar}
+                    userRole={userRole}
+                    signOut={signOut}
+                    canSeeMaintenance={canSeeMaintenance}
+                />
 
-                {showDebug && (
-                    <div className="fixed top-16 right-4 z-50">
-                        <RoleDebugger />
-                    </div>
-                )}
                 <main className="flex-1 mt-16 p-4 overflow-auto">
                     <Outlet />
                 </main>

@@ -112,6 +112,35 @@ firebase deploy --only database
 Do this **before** merging to `main`, or the app will ship against rules that
 have no `assets`, `bookings` or `bookingSlots` nodes and every write will fail.
 
+## Staff only ever see Bookings
+
+Ordinary teachers sign in to book rooms, vehicles and equipment. They do **not**
+see the maintenance portal - no dashboard, no jobs, no tickets. This is enforced
+in two places:
+
+- **UI**: the maintenance nav is hidden, `/` redirects to `/bookings`, and the
+  route guard bounces any `/admin/*` attempt.
+- **Rules**: `tickets` and `staff` can only be read by admins and by people
+  listed in `maintenanceStaff/{uid}`. Hiding the links alone would be cosmetic -
+  the data would still be one fetch away.
+
+Manage the list at **Admin -> Portal access** (`/admin/access`). Admins always
+have access and do not need to be ticked.
+
+### Deploy this in the right order
+
+The rules lock tickets down to `admins/{uid}` and `maintenanceStaff/{uid}`.
+Deploying them before the list is populated locks the maintenance team out of
+their own tickets. So:
+
+1. Merge and deploy the **frontend** first. Everyone who signs in now
+   self-registers under `users/{uid}`.
+2. Ask the maintenance team to sign in once so they appear in the picker.
+3. Tick them under **Admin -> Portal access**.
+4. Only then run `firebase deploy --only database`.
+
+Admins are covered by `admins/{uid}` throughout, so you cannot lock yourself out.
+
 ## Access is restricted to @maristsj.co.za
 
 Sign-in is now gated to school Google accounts, enforced in the rules rather than

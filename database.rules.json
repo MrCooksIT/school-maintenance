@@ -1,7 +1,16 @@
 {
   "rules": {
+    "maintenanceStaff": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".validate": "newData.isBoolean()"
+      }
+    },
+
     "tickets": {
-      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za') && (root.child('admins').child(auth.uid).exists() || root.child('maintenanceStaff').child(auth.uid).exists())",
       ".indexOn": ["status", "assignedTo", "createdAt"],
       "$ticketId": {
         ".write": "(auth != null && auth.token.email.endsWith('@maristsj.co.za')) || !data.exists()",
@@ -9,7 +18,7 @@
       }
     },
     "staff": {
-      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+      ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za') && (root.child('admins').child(auth.uid).exists() || root.child('maintenanceStaff').child(auth.uid).exists())",
       ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
     },
     "admins": {
