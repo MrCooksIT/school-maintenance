@@ -1,7 +1,7 @@
 // Add these logs to src/config/firebase.js to verify configuration loading
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getDatabase } from 'firebase/database';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getDatabase, connectDatabaseEmulator } from 'firebase/database';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -31,6 +31,17 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const database = getDatabase(app);
 const storage = getStorage(app);
+
+// Local development against the Firebase emulator suite.
+//
+// Only ever runs when VITE_USE_EMULATORS is explicitly "true", which is set in a
+// gitignored .env.local. The deployed build never sets it, so production is
+// untouched by this block.
+if (import.meta.env.VITE_USE_EMULATORS === 'true') {
+    console.warn('Using Firebase EMULATORS - no production data is being touched.');
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+    connectDatabaseEmulator(database, '127.0.0.1', 9000);
+}
 
 // Log services initialization
 console.log("Firebase services initialized:", {

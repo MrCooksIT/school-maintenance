@@ -4,10 +4,16 @@ import ReopenRequestsBadge from '../admin/ReopenRequestsBadge';
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
+import PendingApprovalsBadge from '../bookings/PendingApprovalsBadge';
 import {
     LayoutDashboard,
     ClipboardList,
     CalendarDays,
+    CalendarPlus,
+    CalendarCheck,
+    CalendarClock,
+    Boxes,
+    ShieldCheck,
     MapPin,
     Users,
     BarChart4,
@@ -36,8 +42,23 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Tasks', icon: <CalendarDays className="h-5 w-5" />, path: '/admin/calendar' },
     ];
 
+    // Bookings - open to every signed-in staff member
+    const bookingRoutes = [
+        { name: 'Book an asset', icon: <CalendarPlus className="h-5 w-5" />, path: '/bookings' },
+        { name: 'My bookings', icon: <CalendarCheck className="h-5 w-5" />, path: '/bookings/mine' },
+        {
+            name: 'Approvals',
+            icon: <ShieldCheck className="h-5 w-5" />,
+            path: '/bookings/approvals',
+            badge: <PendingApprovalsBadge />
+        },
+    ];
+
     // Admin-only routes
     const adminRoutes = [
+        { name: 'All bookings', icon: <CalendarClock className="h-5 w-5" />, path: '/bookings/all' },
+        { name: 'Bookable assets', icon: <Boxes className="h-5 w-5" />, path: '/bookings/assets' },
+        { name: 'Booking approvers', icon: <ShieldCheck className="h-5 w-5" />, path: '/bookings/approvers' },
         { name: 'Analytics', icon: <BarChart4 className="h-5 w-5" />, path: '/admin/analytics' },
         {
             name: 'Reopen Requests',
@@ -93,6 +114,29 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                         >
                             {item.icon}
                             {item.name}
+                        </Link>
+                    ))}
+                </div>
+
+                {/* Bookings - rooms, vehicles and equipment */}
+                <div className="mb-4">
+                    <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                        Bookings
+                    </p>
+                    {bookingRoutes.map((item) => (
+                        <Link
+                            key={item.path}
+                            to={item.path}
+                            className={`flex items-center justify-between px-4 py-2 mt-1 rounded-lg text-sm ${isActiveRoute(item.path)
+                                ? 'bg-blue-600 text-white'
+                                : 'text-gray-300 hover:bg-blue-700/50'
+                                }`}
+                        >
+                            <div className="flex items-center gap-3">
+                                {item.icon}
+                                {item.name}
+                            </div>
+                            {item.badge && item.badge}
                         </Link>
                     ))}
                 </div>

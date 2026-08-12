@@ -21,7 +21,12 @@ const ADMIN_ROUTES = [
     '/admin/workload',
     '/admin/locations',
     '/admin/categories',
-    '/admin/team'
+    '/admin/team',
+    // Booking admin. /bookings and /bookings/mine stay open to all staff, and
+    // /bookings/approvals is open because approvers are not necessarily admins.
+    '/bookings/all',
+    '/bookings/assets',
+    '/bookings/approvers'
 ];
 
 // List of full-admin-only routes
@@ -29,11 +34,39 @@ const FULL_ADMIN_ROUTES = [
     '/admin/roles'
 ];
 const DEFAULT_ADMIN_EMAIL = 'acoetzee@maristsj.co.za';
+const ALLOWED_EMAIL_DOMAIN = '@maristsj.co.za';
+
+/**
+ * Record this account under users/{uid} on sign-in.
+ *
+ * staff/ and admins/ are keyed by push id, so there is no way to look a person
+ * up by their Firebase uid - which is what the security rules match on. This
+ * gives the booking system a uid-keyed directory so approvers can be assigned
+ * by name instead of by pasting raw uids. Best effort: never block sign-in.
+ */
+async function registerUserDirectoryEntry(authUser) {
+    if (!authUser?.email?.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) return;
+    try {
+        await update(ref(database, `users/${authUser.uid}`), {
+            email: authUser.email,
+            name: authUser.displayName || authUser.email,
+            photoURL: authUser.photoURL || null,
+            lastSeen: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Could not record user directory entry:', error);
+    }
+}
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [userRole, setUserRole] = useState(null);
+    // Whether a record exists at admins/{uid} specifically. userRole can also come
+    // from the staff node, but the security rules only ever check admins/{uid} -
+    // so this is what the booking UI must gate on to avoid showing buttons that
+    // the database will refuse.
+    const [isDatabaseAdmin, setIsDatabaseAdmin] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -133,6 +166,7 @@ export function AuthProvider({ children }) {
         // Listen for admin role changes
         const adminRef = ref(database, `admins/${user.uid}`);
         const unsubscribeAdmin = onValue(adminRef, (snapshot) => {
+            setIsDatabaseAdmin(snapshot.exists());
             if (snapshot.exists()) {
                 const adminData = snapshot.val();
                 console.log("Admin role change detected for", user.email, "- new role:", adminData.role);
@@ -172,8 +206,10 @@ export function AuthProvider({ children }) {
 
             if (authUser) {
                 // Do not set role here, it will be set by the real-time listener
+                registerUserDirectoryEntry(authUser);
             } else {
                 setUserRole(null);
+                setIsDatabaseAdmin(false);
             }
 
             setLoading(false);
@@ -192,10 +228,21 @@ export function AuthProvider({ children }) {
 
     const signIn = async () => {
         const provider = new GoogleAuthProvider();
+        // Nudges the Google chooser towards school accounts. This is a hint only -
+        // the security rules are what actually enforce the domain.
+        provider.setCustomParameters({ hd: 'maristsj.co.za' });
+
         try {
             console.log("Starting Google sign in...");
             const result = await signInWithPopup(auth, provider);
+
+            if (!result.user.email?.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN)) {
+                await firebaseSignOut(auth);
+                throw new Error(`Please sign in with your school account (${ALLOWED_EMAIL_DOMAIN}).`);
+            }
+
             console.log("Sign in successful for:", result.user.email);
+            await registerUserDirectoryEntry(result.user);
 
             // Role will be set by the real-time listener
             return result.user;
@@ -224,6 +271,7 @@ export function AuthProvider({ children }) {
         signOut,
         userRole,
         isAdmin,
+        isDatabaseAdmin,
         refreshUserRole
     };
 

@@ -17,6 +17,12 @@ import AdminRoleManager from './components/admin/AdminRoleManager';
 import PageNotFound from './components/PageNotFound';
 import ReopenRequestsManager from './components/admin/ReopenRequestsManager';
 import PublicTicketForm from './components/public/PublicTicketForm';
+import BookingCalendar from './components/bookings/BookingCalendar';
+import MyBookings from './components/bookings/MyBookings';
+import ApprovalsQueue from './components/bookings/ApprovalsQueue';
+import BookingsDashboard from './components/bookings/BookingsDashboard';
+import AssetsManager from './components/bookings/AssetsManager';
+import ApproversManager from './components/bookings/ApproversManager';
 
 
 function App() {
@@ -48,6 +54,14 @@ function App() {
             <Route path="admin/team" element={<Team />} />
             <Route path="admin/roles" element={<AdminRoleManager />} />
             <Route path="admin/reopen-requests" element={<ReopenRequestsManager />} />
+
+            {/* Bookings - rooms, vehicles and equipment */}
+            <Route path="bookings" element={<BookingCalendar />} />
+            <Route path="bookings/mine" element={<MyBookings />} />
+            <Route path="bookings/approvals" element={<ApprovalsQueue />} />
+            <Route path="bookings/all" element={<BookingsDashboard />} />
+            <Route path="bookings/assets" element={<AssetsManager />} />
+            <Route path="bookings/approvers" element={<ApproversManager />} />
 
             {/* Fallback */}
             <Route path="*" element={<PageNotFound />} />
