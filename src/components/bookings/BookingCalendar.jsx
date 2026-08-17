@@ -21,12 +21,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAssets, useBookingsForAsset } from './useBookingData';
 import BookingModal from './BookingModal';
+import BookingWeekView from './BookingWeekView';
+import BookingMonthView from './BookingMonthView';
 import {
     daySlots,
     rangesOverlap,
     isBlocking,
     formatTime,
     toDateInputValue,
+    startOfWeek,
+    addDays,
     DEFAULT_HOURS
 } from './bookingUtils';
 
@@ -50,6 +54,12 @@ const BookingCalendar = () => {
     const [day, setDay] = useState(() => startOfDay(new Date()));
     const [modalOpen, setModalOpen] = useState(false);
     const [pendingSlot, setPendingSlot] = useState(null);
+
+    // Week on a desktop, day on a phone - the tappable ladder is the better
+    // between-classes experience, and a 7-column grid is cramped below 768px.
+    const [view, setView] = useState(() =>
+        typeof window !== 'undefined' && window.innerWidth >= 768 ? 'week' : 'day'
+    );
 
     const activeAssets = useMemo(
         () => assets.filter((a) => a.status !== 'retired'),
@@ -85,10 +95,30 @@ const BookingCalendar = () => {
         });
     }, [slots, bookings]);
 
-    const shiftDay = (deltaDays) => {
-        const next = new Date(day);
-        next.setDate(next.getDate() + deltaDays);
-        setDay(startOfDay(next));
+    // Paging steps by whatever unit is on screen.
+    const shift = (direction) => {
+        if (view === 'week') {
+            setDay(addDays(day, direction * 7));
+        } else if (view === 'month') {
+            setDay(startOfDay(new Date(day.getFullYear(), day.getMonth() + direction, 1)));
+        } else {
+            setDay(addDays(day, direction));
+        }
+    };
+
+    const periodLabel = () => {
+        if (view === 'month') {
+            return day.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
+        }
+        if (view === 'week') {
+            const start = startOfWeek(day);
+            const end = addDays(start, 6);
+            const sameMonth = start.getMonth() === end.getMonth();
+            return sameMonth
+                ? `${start.getDate()}-${end.getDate()} ${start.toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })}`
+                : `${start.getDate()} ${start.toLocaleDateString('en-ZA', { month: 'short' })} - ${end.getDate()} ${end.toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })}`;
+        }
+        return day.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long' });
     };
 
     const openBookingFor = (slot) => {
@@ -182,28 +212,50 @@ const BookingCalendar = () => {
                 </div>
             )}
 
-            {/* Day navigation */}
-            <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => shiftDay(-1)} aria-label="Previous day">
-                    <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Input
-                    type="date"
-                    value={toDateInputValue(day)}
-                    onChange={(e) => {
-                        if (!e.target.value) return;
-                        const [y, m, d] = e.target.value.split('-').map(Number);
-                        setDay(startOfDay(new Date(y, m - 1, d)));
-                    }}
-                    className="flex-1"
-                />
-                <Button variant="outline" size="icon" onClick={() => shiftDay(1)} aria-label="Next day">
-                    <ChevronRight className="h-4 w-4" />
-                </Button>
+            {/* View switcher */}
+            <div className="flex items-center justify-between gap-2">
+                <div className="inline-flex rounded-lg border bg-white p-0.5">
+                    {['day', 'week', 'month'].map((v) => (
+                        <button
+                            key={v}
+                            onClick={() => setView(v)}
+                            className={`rounded-md px-3 py-1.5 text-sm capitalize transition-colors ${view === v ? 'bg-marist text-white' : 'text-gray-600 hover:bg-gray-50'
+                                }`}
+                        >
+                            {v}
+                        </button>
+                    ))}
+                </div>
                 {!isToday && (
                     <Button variant="outline" onClick={() => setDay(startOfDay(new Date()))}>
                         Today
                     </Button>
+                )}
+            </div>
+
+            {/* Period navigation */}
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => shift(-1)} aria-label={`Previous ${view}`}>
+                    <ChevronLeft className="h-4 w-4" />
+                </Button>
+
+                <div className="flex-1 text-center text-sm font-medium">{periodLabel()}</div>
+
+                <Button variant="outline" size="icon" onClick={() => shift(1)} aria-label={`Next ${view}`}>
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+
+                {view === 'day' && (
+                    <Input
+                        type="date"
+                        value={toDateInputValue(day)}
+                        onChange={(e) => {
+                            if (!e.target.value) return;
+                            const [y, m, d] = e.target.value.split('-').map(Number);
+                            setDay(startOfDay(new Date(y, m - 1, d)));
+                        }}
+                        className="w-40 shrink-0"
+                    />
                 )}
             </div>
 
@@ -212,6 +264,20 @@ const BookingCalendar = () => {
                 <div className="flex items-center justify-center h-40">
                     <Loader className="h-6 w-6 animate-spin text-blue-500" />
                 </div>
+            ) : view === 'week' ? (
+                <BookingWeekView
+                    day={day}
+                    asset={selectedAsset}
+                    bookings={bookings}
+                    onSelectSlot={openBookingFor}
+                    onSelectDay={(d) => { setDay(startOfDay(d)); setView('day'); }}
+                />
+            ) : view === 'month' ? (
+                <BookingMonthView
+                    day={day}
+                    bookings={bookings}
+                    onSelectDay={(d) => { setDay(startOfDay(d)); setView('day'); }}
+                />
             ) : slotState.length === 0 ? (
                 <div className="rounded-lg border bg-amber-50 p-6 text-center text-sm text-amber-800">
                     <p className="font-medium">No bookable hours for this asset.</p>

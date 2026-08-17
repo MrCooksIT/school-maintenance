@@ -4,7 +4,8 @@
 // No emulator needed.  Run with:  npm run test:slots
 
 import {
-    slotKeysForRange, rangesOverlap, daySlots, floorToSlot, ceilToSlot
+    slotKeysForRange, rangesOverlap, daySlots, floorToSlot, ceilToSlot,
+    startOfWeek, weekDays, monthGrid, addDays, isSameDay, bookingsOnDay
 } from '../src/components/bookings/bookingUtils.js';
 
 let pass = 0, fail = 0;
@@ -85,6 +86,56 @@ const bad = daySlots(new Date(2026, 7, 12), { dayStart: 'nonsense', dayEnd: null
 check('malformed hours fall back to defaults rather than rendering nothing', bad.length === 20, String(bad.length));
 const missing = daySlots(new Date(2026, 7, 12), undefined, 30);
 check('missing hours object falls back to defaults', missing.length === 20, String(missing.length));
+
+console.log('\nweek navigation');
+// 12 Aug 2026 is a Wednesday.
+const wed = new Date(2026, 7, 12);
+check('12 Aug 2026 is a Wednesday', wed.getDay() === 3, String(wed.getDay()));
+const wkStart = startOfWeek(wed);
+check('week starts Monday 10 Aug', wkStart.getDate() === 10 && wkStart.getDay() === 1,
+    `${wkStart.getDate()}/${wkStart.getDay()}`);
+const wk = weekDays(wed);
+check('seven days in the week', wk.length === 7);
+check('runs Mon 10 to Sun 16', wk[0].getDate() === 10 && wk[6].getDate() === 16,
+    `${wk[0].getDate()}-${wk[6].getDate()}`);
+check('a Monday is its own week start', startOfWeek(new Date(2026, 7, 10)).getDate() === 10);
+check('a Sunday belongs to the week that began Monday',
+    startOfWeek(new Date(2026, 7, 16)).getDate() === 10,
+    String(startOfWeek(new Date(2026, 7, 16)).getDate()));
+
+console.log('\nmonth grid');
+const grid = monthGrid(new Date(2026, 7, 12));
+check('always 42 cells', grid.length === 42, String(grid.length));
+check('starts on a Monday', grid[0].getDay() === 1);
+check('contains the whole of August', grid.some(d => d.getDate() === 1 && d.getMonth() === 7)
+    && grid.some(d => d.getDate() === 31 && d.getMonth() === 7));
+const febGrid = monthGrid(new Date(2028, 1, 1)); // leap year
+check('leap February still 42 cells and includes the 29th',
+    febGrid.length === 42 && febGrid.some(d => d.getMonth() === 1 && d.getDate() === 29));
+
+console.log('\nhelpers');
+check('isSameDay ignores time', isSameDay(new Date(2026, 7, 12, 3), new Date(2026, 7, 12, 22)));
+check('isSameDay rejects different days', !isSameDay(new Date(2026, 7, 12), new Date(2026, 7, 13)));
+check('addDays crosses a month boundary',
+    addDays(new Date(2026, 7, 31), 1).getMonth() === 8);
+
+console.log('\nbookingsOnDay');
+const sample = [
+    { id: 'a', status: 'confirmed', start: at(9), end: at(10) },
+    { id: 'b', status: 'pending', start: at(11), end: at(12) },
+    { id: 'c', status: 'cancelled', start: at(13), end: at(14) },
+    { id: 'd', status: 'declined', start: at(15), end: at(16) },
+    // spans midnight into 13 Aug
+    { id: 'e', status: 'confirmed', start: new Date(2026, 7, 12, 23).getTime(), end: new Date(2026, 7, 13, 2).getTime() }
+];
+const onDay = bookingsOnDay(sample, new Date(2026, 7, 12));
+check('excludes cancelled and declined', !onDay.some(b => ['c', 'd'].includes(b.id)));
+check('includes confirmed and pending', onDay.some(b => b.id === 'a') && onDay.some(b => b.id === 'b'));
+check('includes an overnight booking on its start day', onDay.some(b => b.id === 'e'));
+const nextDay = bookingsOnDay(sample, new Date(2026, 7, 13));
+check('overnight booking also appears on the following day',
+    nextDay.length === 1 && nextDay[0].id === 'e', JSON.stringify(nextDay.map(b => b.id)));
+check('sorted by start time', onDay.every((b, i, arr) => i === 0 || arr[i - 1].start <= b.start));
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

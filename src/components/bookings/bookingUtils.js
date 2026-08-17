@@ -123,6 +123,69 @@ export function fromDateTimeInputs(dateStr, timeStr) {
 
 export const DEFAULT_HOURS = { dayStart: '07:00', dayEnd: '17:00' };
 
+// ---------------------------------------------------------------------------
+// Week and month navigation. Weeks start on Monday - a school week reads
+// Mon-Sun, and putting Sunday first pushes the weekend into the middle.
+// ---------------------------------------------------------------------------
+
+export const WEEK_STARTS_ON = 1; // Monday
+
+export function startOfDay(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+export function addDays(date, amount) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + amount);
+    return d;
+}
+
+export function startOfWeek(date, weekStartsOn = WEEK_STARTS_ON) {
+    const d = startOfDay(date);
+    const diff = (d.getDay() - weekStartsOn + 7) % 7;
+    return addDays(d, -diff);
+}
+
+/** The seven days of the week containing `date`. */
+export function weekDays(date) {
+    const start = startOfWeek(date);
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+/**
+ * A month as a 6x7 grid of days, padded with the surrounding month's days so
+ * every row is a full week. Always 42 cells, so the grid never reflows height
+ * as you page through months.
+ */
+export function monthGrid(date) {
+    const first = new Date(date.getFullYear(), date.getMonth(), 1);
+    const start = startOfWeek(first);
+    return Array.from({ length: 42 }, (_, i) => addDays(start, i));
+}
+
+export function isSameDay(a, b) {
+    const x = new Date(a);
+    const y = new Date(b);
+    return x.getFullYear() === y.getFullYear()
+        && x.getMonth() === y.getMonth()
+        && x.getDate() === y.getDate();
+}
+
+export function isToday(date) {
+    return isSameDay(date, new Date());
+}
+
+/** Bookings overlapping a given day, in start order. */
+export function bookingsOnDay(bookings, day) {
+    const from = startOfDay(day).getTime();
+    const to = addDays(startOfDay(day), 1).getTime();
+    return bookings
+        .filter((b) => isBlocking(b) && rangesOverlap(from, to, b.start, b.end))
+        .sort((a, b) => a.start - b.start);
+}
+
 /**
  * The slot ladder shown for one asset on one day, e.g. 07:00, 07:30, ... 16:30.
  * Display granularity is coarser than the 15-minute locking granularity so the
