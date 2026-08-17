@@ -71,21 +71,76 @@ export function canApprove({ uid, isDatabaseAdmin, asset, globalApprovers }) {
     return false;
 }
 
+/**
+ * Drop a notification into each recipient's own inbox.
+ *
+ * Written to bookingNotifications/{uid}/ rather than the flat notifications node
+ * the ticket system uses, so each person can only read their own, and so a
+ * per-user query needs no index gymnastics.
+ *
+ * emailSent is left false; the Apps Script mailer picks those up and flips it.
+ * See apps-script/bookingEmails.gs.
+ */
 async function notify(entries) {
     // Notifications are a side effect - a failure here must never lose a booking.
     try {
         const updates = {};
-        entries.forEach((entry) => {
-            const key = push(ref(database, 'notifications')).key;
-            updates[`notifications/${key}`] = {
-                ...entry,
+        entries.filter((e) => e.userId).forEach((entry) => {
+            const { userId, ...rest } = entry;
+            const key = push(ref(database, `bookingNotifications/${userId}`)).key;
+            updates[`bookingNotifications/${userId}/${key}`] = {
+                ...rest,
                 read: false,
+                emailSent: false,
                 createdAt: new Date().toISOString()
             };
         });
         if (Object.keys(updates).length) await update(ref(database), updates);
     } catch (error) {
         console.error('Booking notification failed (booking itself is unaffected):', error);
+    }
+}
+
+/**
+ * Edit a booking's descriptive details.
+ *
+ * Deliberately cannot touch start, end, asset or status - the rules enforce that
+ * too. A requester can correct or expand their reason at any time; moving a
+ * booking in time stays with approvers and admins.
+ */
+export async function updateBookingDetails({ booking, reason, user }) {
+    const trimmed = (reason || '').trim();
+    if (!trimmed) {
+        throw new Error('Please give a reason for the booking.');
+    }
+    if (trimmed === (booking.reason || '')) {
+        return; // nothing changed
+    }
+
+    const now = new Date().toISOString();
+    await update(ref(database, `bookings/${booking.id}`), {
+        reason: trimmed,
+        updatedAt: now,
+        detailsEditedBy: {
+            uid: user.uid,
+            name: user.displayName || user.email || '',
+            at: now
+        }
+    });
+
+    // Let approvers know the brief changed while they were deciding.
+    if (booking.status === 'pending') {
+        const approverUids = await getApproverUidsForAsset(booking.assetId);
+        await notify(approverUids
+            .filter((uid) => uid !== user.uid)
+            .map((uid) => ({
+                userId: uid,
+                type: 'booking_updated',
+                title: 'Booking details changed',
+                message: `${booking.requester?.name || 'A requester'} updated the reason for ${booking.assetName}`,
+                bookingId: booking.id,
+                assetId: booking.assetId
+            })));
     }
 }
 

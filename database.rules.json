@@ -45,6 +45,17 @@
       ".write": "auth != null && auth.token.email.endsWith('@maristsj.co.za')"
     },
 
+    "bookingNotifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
+        ".indexOn": ["createdAt", "emailSent"],
+        "$notificationId": {
+          ".validate": "newData.hasChildren(['type', 'title', 'createdAt'])"
+        }
+      }
+    },
+
     "users": {
       ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
       "$uid": {
@@ -90,7 +101,7 @@
       "$bookingId": {
         ".write": "auth != null && auth.token.email.endsWith('@maristsj.co.za') && (!data.exists() ? newData.child('requester/uid').val() === auth.uid : (data.child('requester/uid').val() === auth.uid || root.child('admins').child(auth.uid).exists() || root.child('bookingApprovers').child(auth.uid).exists() || root.child('assets').child(data.child('assetId').val()).child('approvers').child(auth.uid).exists()))",
 
-        ".validate": "newData.hasChildren(['assetId', 'start', 'end', 'status', 'requester']) && newData.child('end').val() > newData.child('start').val() && root.child('assets').child(newData.child('assetId').val()).exists() && (root.child('admins').child(auth.uid).exists() || root.child('bookingApprovers').child(auth.uid).exists() || root.child('assets').child(newData.child('assetId').val()).child('approvers').child(auth.uid).exists() ? true : (!data.exists() ? newData.child('status').val() === (root.child('assets').child(newData.child('assetId').val()).child('approvalMode').val() === 'auto' ? 'confirmed' : 'pending') : (newData.child('status').val() === 'cancelled' || (newData.child('status').val() === data.child('status').val() && root.child('assets').child(newData.child('assetId').val()).child('approvalMode').val() === 'auto'))))",
+        ".validate": "newData.hasChildren(['assetId', 'start', 'end', 'status', 'requester']) && newData.child('end').val() > newData.child('start').val() && root.child('assets').child(newData.child('assetId').val()).exists() && (root.child('admins').child(auth.uid).exists() || root.child('bookingApprovers').child(auth.uid).exists() || root.child('assets').child(newData.child('assetId').val()).child('approvers').child(auth.uid).exists() ? true : (!data.exists() ? newData.child('status').val() === (root.child('assets').child(newData.child('assetId').val()).child('approvalMode').val() === 'auto' ? 'confirmed' : 'pending') : (newData.child('status').val() === 'cancelled' || (newData.child('status').val() === data.child('status').val() && newData.child('start').val() === data.child('start').val() && newData.child('end').val() === data.child('end').val() && newData.child('assetId').val() === data.child('assetId').val()))))",
 
         "status": {
           ".validate": "newData.val() === 'pending' || newData.val() === 'confirmed' || newData.val() === 'declined' || newData.val() === 'cancelled'"

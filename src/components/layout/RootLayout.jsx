@@ -9,6 +9,7 @@ import {
     Shield,
     Menu
 } from 'lucide-react';
+import BookingNotificationBell from '../bookings/BookingNotificationBell';
 import SimpleDropdown, {
     SimpleDropdownItem,
     SimpleDropdownDivider,
@@ -65,7 +66,9 @@ const Header = ({ toggleSidebar, userRole, signOut, inBookings }) => {
             </div>
 
             {/* Icons on the right */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+                <BookingNotificationBell />
+
                 {/* User Menu Dropdown */}
                 <SimpleDropdown
                     trigger={

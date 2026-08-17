@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '../auth/AuthProvider';
 import { useAllBookings, useAssets } from './useBookingData';
-import { cancelBooking, amendBooking, SlotConflictError } from './bookingService';
+import { cancelBooking, amendBooking, updateBookingDetails, SlotConflictError } from './bookingService';
 import {
     formatRange,
     toDateInputValue,
@@ -46,6 +46,7 @@ const BookingsDashboard = () => {
     const [amendStart, setAmendStart] = useState('');
     const [amendEnd, setAmendEnd] = useState('');
     const [amendNote, setAmendNote] = useState('');
+    const [amendReason, setAmendReason] = useState('');
     const [amendError, setAmendError] = useState('');
     const [amendSaving, setAmendSaving] = useState(false);
 
@@ -69,6 +70,7 @@ const BookingsDashboard = () => {
         setAmendStart(toTimeInputValue(booking.start));
         setAmendEnd(toTimeInputValue(booking.end));
         setAmendNote('');
+        setAmendReason(booking.reason || '');
         setAmendError('');
     };
 
@@ -84,8 +86,18 @@ const BookingsDashboard = () => {
 
         setAmendSaving(true);
         try {
-            await amendBooking({ booking: amending, start, end, user, note: amendNote.trim() });
-            toast({ title: 'Booking moved', description: `${amending.assetName} updated.`, variant: 'success' });
+            const timeChanged = start !== amending.start || end !== amending.end;
+            if (timeChanged) {
+                await amendBooking({ booking: amending, start, end, user, note: amendNote.trim() });
+            }
+            if (amendReason.trim() !== (amending.reason || '')) {
+                await updateBookingDetails({ booking: amending, reason: amendReason, user });
+            }
+            if (!timeChanged && amendReason.trim() === (amending.reason || '')) {
+                setAmendError('Nothing changed.');
+                return;
+            }
+            toast({ title: 'Booking updated', description: `${amending.assetName} updated.`, variant: 'success' });
             setAmending(null);
         } catch (error) {
             console.error('Could not amend booking:', error);
@@ -266,7 +278,7 @@ const BookingsDashboard = () => {
             <Dialog open={!!amending} onOpenChange={(open) => !open && setAmending(null)}>
                 <DialogContent className="p-6 sm:max-w-[460px]">
                     <DialogHeader className="mb-2">
-                        <DialogTitle>Move booking</DialogTitle>
+                        <DialogTitle>Edit booking</DialogTitle>
                         <DialogDescription>
                             {amending?.assetName} for {amending?.requester?.name}
                         </DialogDescription>
@@ -292,6 +304,14 @@ const BookingsDashboard = () => {
                                 <label className="text-sm font-medium">Until</label>
                                 <Input type="time" step="900" value={amendEnd} onChange={(e) => setAmendEnd(e.target.value)} />
                             </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Reason for the booking</label>
+                            <Textarea
+                                rows={2}
+                                value={amendReason}
+                                onChange={(e) => setAmendReason(e.target.value)}
+                            />
                         </div>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Note to the requester</label>
