@@ -68,5 +68,23 @@ check('20 half-hour slots in a 10 hour day', d.length === 20, String(d.length));
 check('first starts at 07:00', new Date(d[0].start).getHours() === 7);
 check('last ends at 17:00', new Date(d[d.length - 1].end).getHours() === 17);
 
+// Regression: three live assets were configured 05:00-00:00, meaning "open
+// until midnight". That produced an end before the start and an empty calendar.
+console.log('\ndaySlots - end at midnight (regression)');
+const mid = daySlots(new Date(2026, 7, 12), { dayStart: '05:00', dayEnd: '00:00' }, 30);
+check('05:00-00:00 is not empty', mid.length > 0, `got ${mid.length}`);
+check('38 half-hour slots from 05:00 to midnight', mid.length === 38, String(mid.length));
+check('first starts at 05:00', new Date(mid[0].start).getHours() === 5);
+check('last slot ends at midnight next day',
+    new Date(mid[mid.length - 1].end).getDate() === 13 && new Date(mid[mid.length - 1].end).getHours() === 0);
+
+console.log('\ndaySlots - defensive');
+const overnightLadder = daySlots(new Date(2026, 7, 12), { dayStart: '18:00', dayEnd: '06:00' }, 60);
+check('overnight 18:00-06:00 gives 12 hourly slots', overnightLadder.length === 12, String(overnightLadder.length));
+const bad = daySlots(new Date(2026, 7, 12), { dayStart: 'nonsense', dayEnd: null }, 30);
+check('malformed hours fall back to defaults rather than rendering nothing', bad.length === 20, String(bad.length));
+const missing = daySlots(new Date(2026, 7, 12), undefined, 30);
+check('missing hours object falls back to defaults', missing.length === 20, String(missing.length));
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

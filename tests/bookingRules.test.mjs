@@ -383,6 +383,35 @@ async function run() {
     await it('a teacher can check their own access flag', async () => {
         await assertSucceeds(get(ref(asPerson(PEOPLE.teacher), 'maintenanceStaff/t1')));
     });
+    await it('an ordinary teacher cannot edit or reassign a ticket', async () => {
+        await assertFails(update(ref(asPerson(PEOPLE.teacher), 'tickets/t-existing'), {
+            status: 'completed', assignedTo: 'whoever'
+        }));
+    });
+    await it('a limited estate staffer CAN assign and edit a ticket', async () => {
+        await assertSucceeds(update(ref(asPerson(maintenanceTech), 'tickets/t-existing'), {
+            status: 'in-progress', assignedTo: '-NpushId'
+        }));
+    });
+    await it('a signed-in teacher can still report a new fault', async () => {
+        await assertSucceeds(set(ref(asPerson(PEOPLE.teacher), 'tickets/t-from-teacher'), {
+            title: 'Blocked drain', description: 'Quad', status: 'pending',
+            reportedBy: PEOPLE.teacher.name, reporterEmail: PEOPLE.teacher.email
+        }));
+    });
+    await it('a limited estate staffer cannot edit locations or categories', async () => {
+        await assertFails(set(ref(asPerson(maintenanceTech), 'locations/newplace'), { name: 'Nope' }));
+        await assertFails(set(ref(asPerson(maintenanceTech), 'categories/newcat'), { name: 'Nope' }));
+    });
+    await it('a limited estate staffer cannot edit the team or grant access', async () => {
+        await assertFails(set(ref(asPerson(maintenanceTech), 'staff/-NnewGuy'), { name: 'Nope' }));
+        await assertFails(set(ref(asPerson(maintenanceTech), 'maintenanceStaff/t1'), true));
+    });
+    await it('a limited estate staffer cannot create bookable assets', async () => {
+        await assertFails(set(ref(asPerson(maintenanceTech), 'assets/nope'), {
+            name: 'Nope', type: 'room', approvalMode: 'auto', status: 'active'
+        }));
+    });
     await it('the public ticket form can still submit unauthenticated', async () => {
         const anon = testEnv.unauthenticatedContext().database();
         await assertSucceeds(set(ref(anon, 'tickets/t-public'), {

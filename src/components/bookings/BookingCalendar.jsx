@@ -212,6 +212,16 @@ const BookingCalendar = () => {
                 <div className="flex items-center justify-center h-40">
                     <Loader className="h-6 w-6 animate-spin text-blue-500" />
                 </div>
+            ) : slotState.length === 0 ? (
+                <div className="rounded-lg border bg-amber-50 p-6 text-center text-sm text-amber-800">
+                    <p className="font-medium">No bookable hours for this asset.</p>
+                    <p className="mt-1">
+                        Check its bookable hours under Bookable assets - they currently read{' '}
+                        {selectedAsset?.hours?.dayStart || DEFAULT_HOURS.dayStart}
+                        {' to '}
+                        {selectedAsset?.hours?.dayEnd || DEFAULT_HOURS.dayEnd}.
+                    </p>
+                </div>
             ) : (
                 <div className="rounded-lg border overflow-hidden bg-white divide-y">
                     {slotState.map(({ start, end, booking, isFirst }) => {

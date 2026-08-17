@@ -35,7 +35,7 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
     const [adminExpanded, setAdminExpanded] = useState(false);
 
     const isActiveRoute = (path) => location.pathname === path;
-    const isAdmin = userRole === 'admin' || userRole === 'supervisor';
+    const isAdmin = userRole === 'admin';
     const isFullAdmin = userRole === 'admin';
 
     // Show Approvals only to people who can actually approve something, rather

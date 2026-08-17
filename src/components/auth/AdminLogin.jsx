@@ -22,7 +22,7 @@ const AdminLogin = () => {
             await signIn();
 
             // Redirect based on role
-            if (userRole === 'admin' || userRole === 'supervisor') {
+            if (userRole === 'admin') {
                 navigate(from);
             } else {
                 setError("You don't have admin permissions");
