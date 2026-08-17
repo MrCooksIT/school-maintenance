@@ -420,6 +420,60 @@ async function run() {
         }));
     });
 
+    describe('Editing booking details');
+    await seedPending();
+    await it('the requester can edit their own reason', async () => {
+        await assertSucceeds(update(ref(asPerson(PEOPLE.teacher), 'bookings/p1'), {
+            reason: 'Corrected: U15 hockey, not U14',
+            updatedAt: new Date().toISOString()
+        }));
+    });
+    await it('the requester CANNOT move their own booking in time', async () => {
+        await assertFails(update(ref(asPerson(PEOPLE.teacher), 'bookings/p1'), {
+            start: AT(14), end: AT(15), updatedAt: new Date().toISOString()
+        }));
+    });
+    await it('the requester cannot switch their booking to another asset', async () => {
+        await assertFails(update(ref(asPerson(PEOPLE.teacher), 'bookings/p1'), {
+            assetId: 'room1', updatedAt: new Date().toISOString()
+        }));
+    });
+    await it('an unrelated teacher cannot edit the reason', async () => {
+        await assertFails(update(ref(asPerson(PEOPLE.teacher2), 'bookings/p1'), {
+            reason: 'Hijacked', updatedAt: new Date().toISOString()
+        }));
+    });
+    await it('an approver can still move it in time', async () => {
+        await assertSucceeds(update(ref(asPerson(PEOPLE.estate), 'bookings/p1'), {
+            start: AT(14), end: AT(15), updatedAt: new Date().toISOString()
+        }));
+    });
+
+    describe('Notification inboxes');
+    await seed();
+    await it('you can read your own inbox', async () => {
+        await assertSucceeds(get(ref(asPerson(PEOPLE.estate), 'bookingNotifications/em1')));
+    });
+    await it('you cannot read someone else\'s inbox', async () => {
+        await assertFails(get(ref(asPerson(PEOPLE.teacher), 'bookingNotifications/em1')));
+    });
+    await it('a requester can drop a notification into an approver\'s inbox', async () => {
+        await assertSucceeds(set(ref(asPerson(PEOPLE.teacher), 'bookingNotifications/em1/n1'), {
+            type: 'booking_pending', title: 'Booking needs sign-off',
+            createdAt: new Date().toISOString(), read: false, emailSent: false
+        }));
+    });
+    await it('a malformed notification is rejected', async () => {
+        await assertFails(set(ref(asPerson(PEOPLE.teacher), 'bookingNotifications/em1/n2'), {
+            nonsense: true
+        }));
+    });
+    await it('an approver can mark their own notification read', async () => {
+        await assertSucceeds(update(ref(asPerson(PEOPLE.estate), 'bookingNotifications/em1/n1'), {
+            read: true, readAt: new Date().toISOString()
+        }));
+    });
+
     describe('User directory');
     await seed();
     await it('a user can register themselves', async () => {
