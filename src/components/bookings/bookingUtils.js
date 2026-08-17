@@ -130,12 +130,26 @@ export const DEFAULT_HOURS = { dayStart: '07:00', dayEnd: '17:00' };
  */
 export function daySlots(day, hours = DEFAULT_HOURS, stepMinutes = 30) {
     const { dayStart, dayEnd } = { ...DEFAULT_HOURS, ...(hours || {}) };
-    const [sh, sm] = dayStart.split(':').map(Number);
-    const [eh, em] = dayEnd.split(':').map(Number);
+
+    // Fall back to the defaults rather than rendering nothing if an asset was
+    // saved with a malformed time.
+    const parse = (value, fallback) => {
+        const [h, m] = String(value ?? '').split(':').map(Number);
+        return Number.isFinite(h) && Number.isFinite(m) ? [h, m] : fallback;
+    };
+    const [sh, sm] = parse(dayStart, [7, 0]);
+    const [eh, em] = parse(dayEnd, [17, 0]);
 
     const base = new Date(day);
     const cursor = new Date(base.getFullYear(), base.getMonth(), base.getDate(), sh, sm, 0, 0);
     const stop = new Date(base.getFullYear(), base.getMonth(), base.getDate(), eh, em, 0, 0);
+
+    // "05:00 - 00:00" means open until midnight, not a zero-length day. Any end
+    // at or before the start rolls over to the following morning, which also
+    // covers genuinely overnight assets.
+    if (stop <= cursor) {
+        stop.setDate(stop.getDate() + 1);
+    }
 
     const out = [];
     while (cursor < stop) {

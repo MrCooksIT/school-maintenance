@@ -115,9 +115,11 @@ export function AuthProvider({ children }) {
             }
         }
 
-        // Check admin route access
+        // Check admin route access. 'supervisor' used to count as admin here,
+        // which let a limited estate staffer reshape locations, categories and
+        // team. Admin now means admin.
         if (user && ADMIN_ROUTES.some(route => location.pathname.startsWith(route))) {
-            if (userRole !== 'admin' && userRole !== 'supervisor') {
+            if (userRole !== 'admin') {
                 console.log('Access denied: Admin-only route');
                 navigate('/', { replace: true });
                 return;
@@ -289,9 +291,10 @@ export function AuthProvider({ children }) {
         });
     };
 
-    // Check if user has admin privileges
+    // Check if user has admin privileges. Limited estate staff get ticket access
+    // through maintenanceStaff/{uid}, not through a role that shades into admin.
     const isAdmin = () => {
-        return userRole === 'admin' || userRole === 'supervisor';
+        return userRole === 'admin';
     };
 
     const value = {

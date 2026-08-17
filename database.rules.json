@@ -1,8 +1,8 @@
 {
   "rules": {
     "maintenanceStaff": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
-      ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".read": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'",
+      ".write": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'",
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".validate": "newData.isBoolean()"
@@ -13,13 +13,13 @@
       ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za') && (root.child('admins').child(auth.uid).exists() || root.child('maintenanceStaff').child(auth.uid).exists())",
       ".indexOn": ["status", "assignedTo", "createdAt"],
       "$ticketId": {
-        ".write": "(auth != null && auth.token.email.endsWith('@maristsj.co.za')) || !data.exists()",
+        ".write": "!data.exists() || (auth != null && auth.token.email.endsWith('@maristsj.co.za') && (root.child('admins').child(auth.uid).exists() || root.child('maintenanceStaff').child(auth.uid).exists()))",
         ".validate": "auth != null || (newData.hasChildren(['title', 'description', 'reportedBy', 'reporterEmail', 'status']) && newData.child('status').val() === 'pending' && newData.child('reporterEmail').val().endsWith('@maristsj.co.za'))"
       }
     },
     "staff": {
       ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za') && (root.child('admins').child(auth.uid).exists() || root.child('maintenanceStaff').child(auth.uid).exists())",
-      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+      ".write": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'"
     },
     "admins": {
       ".read": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'",
@@ -30,11 +30,11 @@
     },
     "categories": {
       ".read": true,
-      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+      ".write": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'"
     },
     "locations": {
       ".read": true,
-      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+      ".write": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'"
     },
     "notifications": {
       ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
@@ -57,7 +57,7 @@
       ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
       ".indexOn": ["type", "status"],
       "$assetId": {
-        ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+        ".write": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'",
         ".validate": "newData.hasChildren(['name', 'type', 'approvalMode', 'status'])",
         "name": {
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
@@ -80,7 +80,7 @@
 
     "bookingApprovers": {
       ".read": "auth != null && auth.token.email.endsWith('@maristsj.co.za')",
-      ".write": "auth != null && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && root.child('admins').child(auth.uid).child('role').val() === 'admin'",
       "$uid": { ".validate": "newData.isBoolean() || newData.hasChildren(['name'])" }
     },
 
