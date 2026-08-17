@@ -1,6 +1,6 @@
 // src/components/layout/RootLayout.jsx
 import React, { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import Sidebar from './Sidebar';
 import {
@@ -39,7 +39,7 @@ const SimpleButton = ({ children, onClick, className = "", variant = "default" }
 };
 
 // Header Component
-const Header = ({ toggleSidebar, userRole, signOut, canSeeMaintenance }) => {
+const Header = ({ toggleSidebar, userRole, signOut, inBookings }) => {
     const navigate = useNavigate();
     const isAdmin = userRole === 'admin';
 
@@ -59,7 +59,7 @@ const Header = ({ toggleSidebar, userRole, signOut, canSeeMaintenance }) => {
                 <img src="/school-maintenance/school-logo2.png" alt="SJMC Logo" className="h-12" />
                 <div className="hidden md:block text-center">
                     <h1 className="text-xl font-semibold">
-                        {canSeeMaintenance ? 'SJMC Maintenance Portal' : 'SJMC Bookings'}
+                        {inBookings ? 'SJMC Bookings' : 'SJMC Maintenance Portal'}
                     </h1>
                 </div>
             </div>
@@ -110,7 +110,11 @@ const Header = ({ toggleSidebar, userRole, signOut, canSeeMaintenance }) => {
 
 const RootLayout = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const { userRole, signOut, canSeeMaintenance } = useAuth();
+    const { userRole, signOut } = useAuth();
+    const location = useLocation();
+    // Title follows the workspace you are actually in, not what you are allowed
+    // to see - an admin sitting on a bookings page should not read "Maintenance".
+    const inBookings = location.pathname.startsWith('/bookings');
 
     const toggleSidebar = () => {
         setIsSidebarOpen((prev) => !prev);
@@ -127,7 +131,7 @@ const RootLayout = () => {
                     toggleSidebar={toggleSidebar}
                     userRole={userRole}
                     signOut={signOut}
-                    canSeeMaintenance={canSeeMaintenance}
+                    inBookings={inBookings}
                 />
 
                 <main className="flex-1 mt-16 p-4 overflow-auto">
