@@ -8,7 +8,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:slots": "node tests/slotLogic.test.mjs",
-    "test:rules": "firebase emulators:exec --only database --project demo-sjmc-bookings \"node tests/bookingRules.test.mjs\""
+    "test:rules": "firebase emulators:exec --only database --project demo-sjmc-bookings \"node tests/bookingRules.test.mjs\"",
+    "test:alerts": "node tests/ticketAlerts.test.mjs"
   },
   "dependencies": {
     "@firebase/database": "^1.0.12",
