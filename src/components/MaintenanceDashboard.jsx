@@ -1,5 +1,7 @@
 // src/components/MaintenanceDashboard.jsx - Enhanced with reliable auto-refresh
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import TicketAlertBanners from './tickets/TicketAlertBanners';
+import { getTicketAlerts, isOverdue } from './tickets/ticketAlerts';
 import { ref, onValue, get } from 'firebase/database';
 import { database } from '@/config/firebase';
 import TicketDetailsModal from './tickets/TicketDetailsModal';
@@ -193,7 +195,8 @@ const MaintenanceDashboard = () => {
   const [advancedFilters, setAdvancedFilters] = useState({
     priority: 'any',
     location: '',
-    assignee: 'any'
+    assignee: 'any',
+    overdue: false
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
@@ -437,13 +440,33 @@ const MaintenanceDashboard = () => {
     setAdvancedFilters({
       priority: 'any',
       location: '',
-      assignee: 'any'
+      assignee: 'any',
+      overdue: false
     });
     setDateRange({
       from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
       to: new Date()
     });
   };
+
+  // Alert counts deliberately ignore the date range and search box: an unassigned
+  // ticket from two months ago is exactly the one that needs chasing.
+  const alerts = getTicketAlerts(tickets);
+
+  // ...which means jumping to the list has to widen the range, or the banner
+  // count and the table below it would disagree.
+  const focusOn = (nextFilters) => {
+    setFilterStatus('open');
+    setSearchQuery('');
+    setDateRange({
+      from: new Date(2000, 0, 1),
+      to: new Date(new Date().setHours(23, 59, 59, 999))
+    });
+    setAdvancedFilters(prev => ({ ...prev, ...nextFilters }));
+  };
+
+  const showUnassigned = () => focusOn({ assignee: 'unassigned', overdue: false });
+  const showOverdue = () => focusOn({ assignee: 'any', overdue: true });
 
   const filteredTickets = tickets.filter(ticket => {
     // Don't show deleted tickets
@@ -484,7 +507,9 @@ const MaintenanceDashboard = () => {
       advancedFilters.assignee === 'any' ||
       (advancedFilters.assignee === 'unassigned' ? !ticket.assignedTo : ticket.assignedTo === advancedFilters.assignee);
 
-    return searchMatch && dateMatch && priorityMatch && locationMatch && assigneeMatch;
+    const overdueMatch = !advancedFilters.overdue || isOverdue(ticket);
+
+    return searchMatch && dateMatch && priorityMatch && locationMatch && assigneeMatch && overdueMatch;
   });
 
   const handleTicketClick = (ticket) => {
@@ -507,6 +532,13 @@ const MaintenanceDashboard = () => {
           </Button>
         </div>
       )}
+
+      {/* Unassigned / overdue prompts */}
+      <TicketAlertBanners
+        alerts={alerts}
+        onShowUnassigned={showUnassigned}
+        onShowOverdue={showOverdue}
+      />
 
       {/* Top section with filters */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow-sm">
@@ -587,7 +619,7 @@ const MaintenanceDashboard = () => {
                 >
                   <Sliders className="h-4 w-4 mr-2" />
                   Advanced Filters
-                  {(advancedFilters.priority !== 'any' || advancedFilters.location || advancedFilters.assignee !== 'any') && (
+                  {(advancedFilters.priority !== 'any' || advancedFilters.location || advancedFilters.assignee !== 'any' || advancedFilters.overdue) && (
                     <span className="absolute top-0 right-0 -mt-1 -mr-1 h-3 w-3 rounded-full bg-blue-500"></span>
                   )}
                 </Button>
@@ -642,6 +674,18 @@ const MaintenanceDashboard = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-500">Due date</label>
+                    <Button
+                      variant={advancedFilters.overdue ? 'default' : 'outline'}
+                      size="sm"
+                      className={advancedFilters.overdue ? 'w-full bg-red-600 hover:bg-red-700 text-white' : 'w-full'}
+                      onClick={() => setAdvancedFilters(prev => ({ ...prev, overdue: !prev.overdue }))}
+                    >
+                      {advancedFilters.overdue ? 'Showing past due only' : 'Past due only'}
+                    </Button>
                   </div>
 
                   <div className="flex justify-between pt-2">

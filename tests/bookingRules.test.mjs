@@ -412,6 +412,40 @@ async function run() {
             name: 'Nope', type: 'room', approvalMode: 'auto', status: 'active'
         }));
     });
+    // The Gmail Apps Script posts to /tickets.json with no auth token, and its
+    // payload shape differs from the web form's. Both must be accepted, or
+    // emailed faults are silently dropped.
+    await it('the email parser can create a ticket unauthenticated', async () => {
+        const anon = testEnv.unauthenticatedContext().database();
+        await assertSucceeds(set(ref(anon, 'tickets/t-email'), {
+            subject: 'Birds in the ceiling above support office',
+            description: 'The birds have taken a liking to the ceiling.',
+            requester: { email: 'j.wright@maristsj.co.za', name: 'Jemma Wright' },
+            status: 'new',
+            category: 'structural',
+            location: 'Office',
+            priority: 'low',
+            createdAt: new Date().toISOString(),
+            ticketId: 'SJMC-571239-468',
+            hasAttachments: false
+        }));
+    });
+    await it('an emailed ticket from outside the school is rejected', async () => {
+        const anon = testEnv.unauthenticatedContext().database();
+        await assertFails(set(ref(anon, 'tickets/t-outsider'), {
+            subject: 'Spam', description: 'Spam',
+            requester: { email: 'spammer@example.com', name: 'Spammer' },
+            status: 'new'
+        }));
+    });
+    await it('an anonymous ticket cannot be created already completed', async () => {
+        const anon = testEnv.unauthenticatedContext().database();
+        await assertFails(set(ref(anon, 'tickets/t-sneaky'), {
+            subject: 'Sneaky', description: 'Sneaky',
+            requester: { email: 'teacher.one@maristsj.co.za', name: 'T' },
+            status: 'completed'
+        }));
+    });
     await it('the public ticket form can still submit unauthenticated', async () => {
         const anon = testEnv.unauthenticatedContext().database();
         await assertSucceeds(set(ref(anon, 'tickets/t-public'), {
