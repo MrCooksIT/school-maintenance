@@ -14,7 +14,7 @@
       ".indexOn": ["status", "assignedTo", "createdAt"],
       "$ticketId": {
         ".write": "!data.exists() || (auth != null && auth.token.email.endsWith('@maristsj.co.za') && (root.child('admins').child(auth.uid).exists() || root.child('maintenanceStaff').child(auth.uid).exists()))",
-        ".validate": "auth != null || (newData.hasChildren(['title', 'description', 'reportedBy', 'reporterEmail', 'status']) && newData.child('status').val() === 'pending' && newData.child('reporterEmail').val().endsWith('@maristsj.co.za'))"
+        ".validate": "auth != null || (newData.hasChildren(['title', 'description', 'reportedBy', 'reporterEmail', 'status']) && newData.child('status').val() === 'pending' && newData.child('reporterEmail').val().endsWith('@maristsj.co.za')) || (newData.hasChildren(['subject', 'description', 'requester', 'status']) && (newData.child('status').val() === 'new' || newData.child('status').val() === 'pending') && newData.child('requester/email').val().endsWith('@maristsj.co.za'))"
       }
     },
     "staff": {
