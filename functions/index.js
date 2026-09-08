@@ -74,133 +74,15 @@ async function sendNewTicketAlert(ticket, ticketId) {
     }
 }
 
-// ---------------------------------------------------------------------------
-// WhatsApp assignment notifications (Meta WhatsApp Business Cloud API)
+// WhatsApp assignment notifications now live in apps-script/whatsappNotify.gs.
 //
-// Fires when a ticket's assignedTo changes in the Realtime Database, looks up
-// the staff member's phone number under staff/{id}, and sends the approved
-// template message. Requires:
-//   - secret  WHATSAPP_TOKEN            (firebase functions:secrets:set WHATSAPP_TOKEN)
-//   - env     WHATSAPP_PHONE_NUMBER_ID  (functions/.env)
-//   - env     WHATSAPP_TEMPLATE_NAME    (functions/.env, default: task_assigned)
-// See docs/WHATSAPP_SETUP.md for the full setup checklist.
-// ---------------------------------------------------------------------------
-
-const WHATSAPP_API_VERSION = process.env.WHATSAPP_API_VERSION || 'v22.0';
-
-// Template body params may not contain newlines, tabs or 4+ consecutive spaces
-function sanitizeTemplateParam(value, fallback) {
-    const text = String(value ?? '').replace(/\s+/g, ' ').trim();
-    return text || fallback;
-}
-
-async function sendWhatsAppTemplate({ to, params }) {
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const templateName = process.env.WHATSAPP_TEMPLATE_NAME || 'task_assigned';
-    const languageCode = process.env.WHATSAPP_TEMPLATE_LANG || 'en';
-
-    if (!process.env.WHATSAPP_TOKEN || !phoneNumberId) {
-        throw new Error('WhatsApp is not configured: missing WHATSAPP_TOKEN secret or WHATSAPP_PHONE_NUMBER_ID env');
-    }
-
-    const response = await fetch(
-        `https://graph.facebook.com/${WHATSAPP_API_VERSION}/${phoneNumberId}/messages`,
-        {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                messaging_product: 'whatsapp',
-                to,
-                type: 'template',
-                template: {
-                    name: templateName,
-                    language: { code: languageCode },
-                    components: [{
-                        type: 'body',
-                        parameters: params.map(text => ({ type: 'text', text }))
-                    }]
-                }
-            })
-        }
-    );
-
-    const result = await response.json();
-    if (!response.ok) {
-        throw new Error(`WhatsApp API error ${response.status}: ${JSON.stringify(result.error || result)}`);
-    }
-    return result;
-}
-
-exports.onTicketAssigned = functions
-    .runWith({ secrets: ['WHATSAPP_TOKEN'] })
-    .database.ref('/tickets/{ticketId}')
-    .onWrite(async (change, context) => {
-        if (!change.after.exists()) return null; // ticket deleted
-
-        const before = change.before.exists() ? change.before.val() : {};
-        const after = change.after.val();
-
-        // Only act when the assignment actually changes to someone
-        if (!after.assignedTo || after.assignedTo === before.assignedTo) return null;
-
-        const db = admin.database();
-        const staffSnap = await db.ref(`staff/${after.assignedTo}`).once('value');
-        if (!staffSnap.exists()) {
-            console.warn(`Ticket ${context.params.ticketId} assigned to unknown staff id ${after.assignedTo}`);
-            return null;
-        }
-
-        const staff = staffSnap.val();
-        const whatsappEnabled = staff.notificationPreferences?.whatsapp !== false;
-        const phoneDigits = String(staff.phone || '').replace(/\D/g, '');
-
-        if (!whatsappEnabled || !phoneDigits) {
-            console.log(`Skipping WhatsApp for ticket ${context.params.ticketId}: staff ${staff.name || after.assignedTo} has no phone or notifications disabled`);
-            return null;
-        }
-
-        // Location may be an id under locations/ or free text
-        let locationName = after.location || '';
-        if (locationName) {
-            const locationSnap = await db.ref(`locations/${locationName}/name`).once('value');
-            if (locationSnap.exists()) locationName = locationSnap.val();
-        }
-
-        const params = [
-            sanitizeTemplateParam(staff.name, 'there'),
-            sanitizeTemplateParam(after.ticketId || context.params.ticketId, context.params.ticketId),
-            sanitizeTemplateParam(after.subject || after.title, 'Maintenance task'),
-            sanitizeTemplateParam(locationName, 'See ticket for details'),
-            sanitizeTemplateParam(after.priority, 'medium')
-        ];
-
-        try {
-            const result = await sendWhatsAppTemplate({ to: phoneDigits, params });
-            console.log(`WhatsApp sent for ticket ${context.params.ticketId} to ${staff.name} (${phoneDigits}), message id: ${result.messages?.[0]?.id}`);
-            await change.after.ref.child('whatsappNotification').set({
-                status: 'sent',
-                to: phoneDigits,
-                staffId: after.assignedTo,
-                messageId: result.messages?.[0]?.id || null,
-                sentAt: new Date().toISOString()
-            });
-        } catch (error) {
-            // Log and record, but never fail the ticket update itself
-            console.error(`WhatsApp send failed for ticket ${context.params.ticketId}:`, error);
-            await change.after.ref.child('whatsappNotification').set({
-                status: 'failed',
-                to: phoneDigits,
-                staffId: after.assignedTo,
-                error: String(error.message || error),
-                failedAt: new Date().toISOString()
-            });
-        }
-
-        return null;
-    });
+// They were implemented here first, as an onWrite trigger on /tickets. That
+// requires Cloud Functions, which requires the Blaze plan - and the Cloud
+// Functions API was never enabled on this project, so the trigger never ran a
+// single time. The Meta Cloud API is only an HTTPS POST, so Apps Script sends
+// them for free from the same place the assignment emails go out.
+//
+// See docs/WHATSAPP_SETUP.md.
 
 // New function to handle ticket status updates
 exports.onTicketStatusChange = functions.firestore

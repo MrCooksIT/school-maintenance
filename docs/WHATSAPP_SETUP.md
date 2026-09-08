@@ -1,14 +1,24 @@
 # WhatsApp Assignment Notifications - Setup Guide
 
-When a ticket's `assignedTo` changes in the Realtime Database, the
-`onTicketAssigned` Cloud Function (`functions/index.js`) sends the assigned
-staff member a WhatsApp template message via the **Meta WhatsApp Business
-Cloud API**, using the phone number captured on the Team page
-(`staff/{id}/phone`, format `+27XXXXXXXXX`).
+When a ticket's `assignedTo` changes, the assigned staff member gets a WhatsApp
+template message via the **Meta WhatsApp Business Cloud API**, using the number
+captured on the Team page (`staff/{id}/phone`, format `+27XXXXXXXXX`).
 
-The result of every attempt is written back to the ticket under
-`whatsappNotification` (`status: sent | failed`), so failures are visible in
-the database, not silent.
+It is sent from **Apps Script** (`apps-script/whatsappNotify.gs`), off the back
+of the same run that sends the assignment emails. The Cloud API is only an
+HTTPS POST, so this needs no Cloud Functions, no Blaze plan and no card on file.
+
+> An earlier version of this lived in `functions/index.js` as a database
+> trigger. It could never run - Cloud Functions requires the Blaze plan and the
+> API was never enabled on this project - so it has been removed in favour of
+> the Apps Script route.
+>
+> A Twilio experiment was also tried and abandoned. It used Twilio's shared
+> sandbox number, which requires every recipient to send `join <code>` first,
+> and it sent free-form text, which WhatsApp only allows within 24 hours of the
+> person messaging you. Business-initiated messages need an approved template on
+> every provider, Twilio included - so Twilio avoided none of the Meta setup
+> below, it only added a markup.
 
 ---
 
@@ -49,32 +59,61 @@ the database, not silent.
    - Params: 1 = staff name, 2 = ticket id, 3 = subject, 4 = location, 5 = priority.
    Approval is usually under a day.
 
-## Part 3 - Deploy
+## Part 3 - Switch it on
 
-```bash
-# one-time: store the permanent token as a secret
-firebase functions:secrets:set WHATSAPP_TOKEN
+No deploy. Two steps in the Apps Script project:
 
-# copy functions/.env.example to functions/.env and fill in
-# WHATSAPP_PHONE_NUMBER_ID (+ template name/lang if different)
+1. Add `apps-script/whatsappNotify.gs` to the project.
+2. Project Settings > Script Properties, add:
 
-firebase deploy --only functions
+   | Property | Value |
+   |---|---|
+   | `WHATSAPP_TOKEN` | the permanent System User token from Part 2 |
+   | `WHATSAPP_PHONE_NUMBER_ID` | from WhatsApp > API Setup |
+   | `WHATSAPP_TEMPLATE_NAME` | optional, defaults to `task_assigned` |
+   | `WHATSAPP_TEMPLATE_LANG` | optional, defaults to `en` |
+
+Then run `testWhatsAppConfig()` (edit the number in it first). It reports what
+is configured and sends one real message.
+
+Until those properties are set, `sendAssignmentWhatsApp` logs that it is not
+configured and returns false. Assignment emails carry on regardless, so it is
+safe to add the file before the Meta side is finished.
+
+## Part 4 - Wire it to assignment
+
+In `notification-system.gs`, inside `sendAssignmentNotification`, replace the
+Twilio block (everything under "STEP 3: WHATSAPP") with:
+
+```js
+sendAssignmentWhatsApp(ticket, staffData, ticketKey);
 ```
 
-## Testing
+Then delete the Twilio functions from `code.gs`:
 
-1. Add yourself on the Team page with your own `+27...` number.
-2. Assign any test ticket to yourself.
-3. You should get the WhatsApp within seconds. If not, check:
-   - the ticket's `whatsappNotification` node for the recorded error
-   - `firebase functions:log --only onTicketAssigned`
+- `sendWhatsAppMessage`
+- `sendWhatsAppWithButtons`
+- `testWhatsAppSend`
+- `testWhatsAppButtons`
 
-## Known failure modes (why the old setup "just stopped")
+**Rotate the Twilio auth token** in the Twilio console regardless. It sat in
+`code.gs` in plaintext, so treat it as exposed even though the experiment is
+over.
 
-- **Expired token** - temporary dashboard tokens die after 24h; use the
-  system-user permanent token.
-- **Template paused/rejected** - Meta pauses templates with bad quality
-  ratings; check WhatsApp Manager.
-- **Stale phone numbers** - the recipient must have WhatsApp active on the
-  exact number stored on the Team page. Errors are recorded on the ticket.
-- **Payment method lapsed** - messages stop silently if billing fails.
+## What gets sent
+
+The approved `task_assigned` template, with five parameters: staff name, ticket
+id, subject, location, priority. The result of every attempt is written to the
+ticket under `whatsappNotification` (`status: sent | failed`, plus the message
+id or the error), so a failure shows up in the data rather than only in an
+execution log.
+
+## Who it can reach
+
+10 of 13 staff records have a correctly formatted `+27` number. Gondre Scholtz,
+Waseem Johnson and "Estate Team" have none and will be skipped until one is
+added on the Team page. Numbers that are not `+27` followed by 9 digits are
+skipped rather than sent to, so a typo cannot message a stranger.
+
+Anyone can opt out by setting `notificationPreferences.whatsapp` to false on
+their staff record.
