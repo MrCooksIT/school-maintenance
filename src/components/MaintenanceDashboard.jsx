@@ -1,6 +1,7 @@
 // src/components/MaintenanceDashboard.jsx - Enhanced with reliable auto-refresh
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import TicketAlertBanners from './tickets/TicketAlertBanners';
+import { useAuth } from './auth/AuthProvider';
 import { getTicketAlerts, isOverdue } from './tickets/ticketAlerts';
 import { ref, onValue, get } from 'firebase/database';
 import { database } from '@/config/firebase';
@@ -17,7 +18,7 @@ import {
   Wifi,
   WifiOff,
   Clock,
-  AlertCircle,
+  AlertCircle, Eye
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -173,6 +174,7 @@ const TicketRow = ({ ticket, onTicketClick, staffMembers }) => {
 
 const MaintenanceDashboard = () => {
   // Core state
+  const { canEditTickets, isObserver } = useAuth();
   const [tickets, setTickets] = useState([]);
   const [filterStatus, setFilterStatus] = useState('open');
   const [commentModalOpen, setCommentModalOpen] = useState(false);
@@ -533,6 +535,15 @@ const MaintenanceDashboard = () => {
         </div>
       )}
 
+      {isObserver && !canEditTickets && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-900">
+          <Eye className="h-4 w-4 shrink-0" />
+          <span className="text-sm">
+            <strong>Oversight view.</strong> You can see everything here but cannot change it.
+          </span>
+        </div>
+      )}
+
       {/* Unassigned / overdue prompts */}
       <TicketAlertBanners
         alerts={alerts}
@@ -771,6 +782,7 @@ const MaintenanceDashboard = () => {
                     ticket={ticket}
                     onTicketClick={handleTicketClick}
                     staffMembers={staffMembers}
+        readOnly={!canEditTickets}
                   />
                 ))
               ) : (

@@ -66,7 +66,7 @@ const getStatusStyle = (status) => {
   return styles[status] || styles.new;
 };
 
-const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = '' }) => {
+const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = '', readOnly = false }) => {
   const [editedData, setEditedData] = useState({});
   const [categories, setCategories] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -188,6 +188,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
 
   const handleQuickUpdate = async (field, value) => {
     if (!ticket || isCompleted) return; // Prevent updates if ticket is completed
+    if (readOnly) return; // oversight accounts observe only - the rules refuse these writes anyway
 
     try {
       // Prepare the base update
@@ -379,6 +380,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
   // Admin function to approve reopening a ticket
   const handleApproveReopen = async () => {
     if (!isCompleted || !editedData.reopenRequested) return;
+    if (readOnly) return;
 
     // Check if user is admin using our helper function
     if (!isUserAdmin()) {
@@ -665,10 +667,10 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                     <Input
                       value={editedData.subject || ''}
                       onChange={(e) => !isCompleted && setEditedData(prev => ({ ...prev, subject: e.target.value }))}
-                      onBlur={() => !isCompleted && editedData.subject !== ticket.subject && handleQuickUpdate('subject', editedData.subject)}
-                      className={`border-gray-300 ${isCompleted ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      disabled={isCompleted}
-                      readOnly={isCompleted}
+                      onBlur={() => !isCompleted && !readOnly && editedData.subject !== ticket.subject && handleQuickUpdate('subject', editedData.subject)}
+                      className={`border-gray-300 ${(isCompleted || readOnly) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      disabled={isCompleted || readOnly}
+                      readOnly={isCompleted || readOnly}
                     />
                   </div>
                   <div className="space-y-2">
@@ -676,10 +678,10 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                     <Textarea
                       value={editedData.description || ''}
                       onChange={(e) => !isCompleted && setEditedData(prev => ({ ...prev, description: e.target.value }))}
-                      onBlur={() => !isCompleted && editedData.description !== ticket.description && handleQuickUpdate('description', editedData.description)}
-                      className={`border-gray-300 min-h-[150px] ${isCompleted ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                      disabled={isCompleted}
-                      readOnly={isCompleted}
+                      onBlur={() => !isCompleted && !readOnly && editedData.description !== ticket.description && handleQuickUpdate('description', editedData.description)}
+                      className={`border-gray-300 min-h-[150px] ${(isCompleted || readOnly) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      disabled={isCompleted || readOnly}
+                      readOnly={isCompleted || readOnly}
                     />
                   </div>
 
@@ -696,7 +698,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                       <Select
                         value={editedData.location || 'none'}
                         onValueChange={(value) => handleQuickUpdate('location', value === 'none' ? null : value)}
-                        disabled={isCompleted}
+                        disabled={isCompleted || readOnly}
                       >
                         <SelectTrigger className="border-gray-300">
                           <SelectValue placeholder="Select location">
@@ -767,7 +769,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                           <Select
                             value={editedData.category || 'none'}
                             onValueChange={(value) => handleQuickUpdate('category', value === 'none' ? null : value)}
-                            disabled={isCompleted}
+                            disabled={isCompleted || readOnly}
                           >
                             <SelectTrigger className="w-36 h-8 border-gray-300">
                               <SelectValue placeholder="Select category">
@@ -820,7 +822,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                       <Select
                         value={editedData.assignedTo || "unassigned"}
                         onValueChange={(value) => handleQuickUpdate('assignedTo', value === 'unassigned' ? null : value)}
-                        disabled={isCompleted}
+                        disabled={isCompleted || readOnly}
                       >
                         <SelectTrigger className="bg-white">
                           <SelectValue placeholder="Assign to staff member" />
@@ -836,7 +838,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                           avoidCollisions={true}
                         >
                           <SelectItem value="unassigned">Unassigned</SelectItem>
-                          {staffMembers?.map((staff) => (
+                          {staffMembers?.filter((staff) => staff.assignable !== false).map((staff) => (
                             <SelectItem key={staff.id} value={staff.id}>
                               {staff.name} - {staff.department}
                             </SelectItem>
@@ -883,7 +885,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                           </div>
 
                           {/* Admin can still approve even with the banner showing */}
-                          {isUserAdmin() && (
+                          {isUserAdmin() && !readOnly && (
                             <Button
                               onClick={handleApproveReopen}
                               className="flex-shrink-0 bg-green-600 hover:bg-green-700 text-white"
@@ -903,7 +905,7 @@ const TicketDetailsModal = ({ ticket, isOpen, onClose, staffMembers, userRole = 
                           </Button>
 
                           {/* Admins see both options */}
-                          {isUserAdmin() && (
+                          {isUserAdmin() && !readOnly && (
                             <Button
                               onClick={handleDirectReopen}
                               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
