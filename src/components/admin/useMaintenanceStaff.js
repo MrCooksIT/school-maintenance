@@ -30,3 +30,27 @@ export function useMaintenanceStaff() {
 
     return { maintenanceStaff, loading };
 }
+
+/** The observers/{uid} allow-list: oversight accounts that can see but not touch. */
+export function useObservers() {
+    const [observers, setObservers] = useState({});
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const unsubscribe = onValue(
+            ref(database, 'observers'),
+            (snapshot) => {
+                setObservers(snapshot.exists() ? snapshot.val() : {});
+                setLoading(false);
+            },
+            (error) => {
+                console.error('Error loading observers:', error);
+                setObservers({});
+                setLoading(false);
+            }
+        );
+        return () => unsubscribe();
+    }, []);
+
+    return { observers, loading };
+}

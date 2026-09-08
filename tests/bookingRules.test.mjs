@@ -454,6 +454,62 @@ async function run() {
         }));
     });
 
+    describe('Oversight (read-only) accounts');
+    await seed();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        const db = ctx.database();
+        await set(ref(db, 'tickets/t-obs'), {
+            subject: 'Broken gate', description: 'd', status: 'new',
+            requester: { email: 'teacher.one@maristsj.co.za', name: 'T' }
+        });
+        await set(ref(db, 'staff/-NsomeStaff'), { name: 'Groundsman', email: 'g@maristsj.co.za' });
+        await set(ref(db, 'observers/head1'), true);
+    });
+    const head = { uid: 'head1', email: 'head@maristsj.co.za', name: 'Head of School' };
+
+    await it('an observer CAN read all tickets', async () => {
+        await assertSucceeds(get(ref(asPerson(head), 'tickets')));
+    });
+    await it('an observer CAN read the staff list (to see assignee names)', async () => {
+        await assertSucceeds(get(ref(asPerson(head), 'staff')));
+    });
+    await it('an observer CANNOT edit a ticket', async () => {
+        await assertFails(update(ref(asPerson(head), 'tickets/t-obs'), { status: 'completed' }));
+    });
+    await it('an observer CANNOT assign a ticket', async () => {
+        await assertFails(update(ref(asPerson(head), 'tickets/t-obs'), { assignedTo: '-NsomeStaff' }));
+    });
+    await it('an observer CANNOT edit staff, locations or categories', async () => {
+        await assertFails(set(ref(asPerson(head), 'staff/-NsomeStaff/name'), 'Renamed'));
+        await assertFails(set(ref(asPerson(head), 'locations/new'), { name: 'Nope' }));
+        await assertFails(set(ref(asPerson(head), 'categories/new'), { name: 'Nope' }));
+    });
+    await it('an observer CANNOT grant themselves more access', async () => {
+        await assertFails(set(ref(asPerson(head), 'maintenanceStaff/head1'), true));
+        await assertFails(set(ref(asPerson(head), 'observers/t1'), true));
+    });
+    await it('an observer CANNOT create or retire bookable assets', async () => {
+        await assertFails(set(ref(asPerson(head), 'assets/nope'), {
+            name: 'Nope', type: 'room', approvalMode: 'auto', status: 'active'
+        }));
+    });
+    await it('an ordinary teacher still cannot read tickets', async () => {
+        await assertFails(get(ref(asPerson(PEOPLE.teacher), 'tickets')));
+    });
+    await it('an observer can check their own oversight flag', async () => {
+        await assertSucceeds(get(ref(asPerson(head), 'observers/head1')));
+    });
+    await it('an admin can grant oversight', async () => {
+        await assertSucceeds(set(ref(asPerson(PEOPLE.admin), 'observers/t2'), true));
+    });
+    await it('an observer can still book an asset like any other teacher', async () => {
+        const { updates } = bookingWrite({
+            bookingId: 'obs1', assetId: 'room1', assetName: 'Meeting Room 1',
+            start: AT(9), end: AT(10), person: head, status: 'confirmed'
+        });
+        await assertSucceeds(update(ref(asPerson(head)), updates));
+    });
+
     describe('Editing booking details');
     await seedPending();
     await it('the requester can edit their own reason', async () => {

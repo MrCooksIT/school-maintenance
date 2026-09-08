@@ -73,6 +73,10 @@ export function AuthProvider({ children }) {
     // ticket system. Backed by maintenanceStaff/{uid}, which is uid-keyed
     // because staff/ is keyed by push id and rules can only match on auth.uid.
     const [isMaintenanceUser, setIsMaintenanceUser] = useState(false);
+    // Oversight only: sees the maintenance portal, changes nothing. Backed by
+    // observers/{uid}, and enforced in the rules - tickets stay readable but
+    // every write path excludes observers.
+    const [isObserver, setIsObserver] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -104,7 +108,7 @@ export function AuthProvider({ children }) {
 
         // Ordinary teachers only get the booking side of the app. Everything
         // under /admin and the ticket dashboard at / belongs to maintenance.
-        if (user && !(isDatabaseAdmin || isMaintenanceUser)) {
+        if (user && !(isDatabaseAdmin || isMaintenanceUser || isObserver)) {
             const isMaintenanceArea =
                 location.pathname === '/' ||
                 (location.pathname.startsWith('/admin') && !location.pathname.startsWith('/admin/login'));
@@ -134,7 +138,7 @@ export function AuthProvider({ children }) {
                 return;
             }
         }
-    }, [user, loading, userRole, isDatabaseAdmin, isMaintenanceUser, location.pathname, navigate]);
+    }, [user, loading, userRole, isDatabaseAdmin, isMaintenanceUser, isObserver, location.pathname, navigate]);
 
     // Function to manually fetch and update user role
     const fetchAndUpdateUserRole = async (userId) => {
@@ -213,6 +217,12 @@ export function AuthProvider({ children }) {
             console.error("Error in admin role listener:", error);
         });
 
+        // Read-only oversight.
+        const observerRef = ref(database, `observers/${user.uid}`);
+        const unsubscribeObserver = onValue(observerRef, (snapshot) => {
+            setIsObserver(snapshot.exists() && snapshot.val() !== false);
+        }, () => setIsObserver(false));
+
         // Maintenance portal access, tracked separately from booking roles.
         const maintenanceRef = ref(database, `maintenanceStaff/${user.uid}`);
         const unsubscribeMaintenance = onValue(maintenanceRef, (snapshot) => {
@@ -226,6 +236,7 @@ export function AuthProvider({ children }) {
             console.log("Cleaning up role listeners");
             unsubscribeAdmin();
             unsubscribeMaintenance();
+            unsubscribeObserver();
         };
     }, [user]);
 
@@ -242,6 +253,7 @@ export function AuthProvider({ children }) {
                 setUserRole(null);
                 setIsDatabaseAdmin(false);
                 setIsMaintenanceUser(false);
+                setIsObserver(false);
             }
 
             setLoading(false);
@@ -306,7 +318,10 @@ export function AuthProvider({ children }) {
         isAdmin,
         isDatabaseAdmin,
         isMaintenanceUser,
-        canSeeMaintenance: isDatabaseAdmin || isMaintenanceUser,
+        isObserver,
+        // Observers reach the portal but never the write paths.
+        canSeeMaintenance: isDatabaseAdmin || isMaintenanceUser || isObserver,
+        canEditTickets: isDatabaseAdmin || isMaintenanceUser,
         refreshUserRole
     };
 
