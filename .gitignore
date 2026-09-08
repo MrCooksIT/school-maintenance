@@ -26,3 +26,4 @@ functions/.env
 *.njsproj
 *.sln
 *.sw?
+.claude/launch.json
