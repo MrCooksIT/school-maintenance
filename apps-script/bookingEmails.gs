@@ -7,9 +7,9 @@
  * it, and flips the flag. Delivery is therefore "within a minute of the event"
  * rather than instant.
  *
- * Paste this into the existing Apps Script project (the one with Firebase.gs -
- * it reuses getAccessToken() from there), then run setupBookingEmailTrigger()
- * once. See docs/BOOKINGS.md.
+ * Add this to the Apps Script project alongside firebaseAuth.gs, whose fbGet_/
+ * fbPatch_ helpers it uses, then run setupBookingEmailTrigger() once.
+ * See docs/BOOKINGS.md.
  *
  * Anyone can opt out without a code change by setting
  *   users/{uid}/notificationPreferences/email = false
@@ -35,25 +35,17 @@ function setupBookingEmailTrigger() {
 }
 
 function firebaseGet_(path) {
-  var url = FIREBASE_DB + path + '.json?access_token=' + getAccessToken();
-  var response = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
-  if (response.getResponseCode() !== 200) {
-    throw new Error('Firebase read failed for ' + path + ': ' + response.getContentText());
+  var result = fbGet_(path);
+  if (result.code !== 200) {
+    throw new Error('Firebase read failed for ' + path + ': ' + result.text);
   }
-  var text = response.getContentText();
-  return text === 'null' ? null : JSON.parse(text);
+  return result.json;
 }
 
 function firebasePatch_(path, payload) {
-  var url = FIREBASE_DB + path + '.json?access_token=' + getAccessToken();
-  var response = UrlFetchApp.fetch(url, {
-    method: 'patch',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  });
-  if (response.getResponseCode() !== 200) {
-    throw new Error('Firebase write failed for ' + path + ': ' + response.getContentText());
+  var result = fbPatch_(path, payload);
+  if (result.code !== 200) {
+    throw new Error('Firebase write failed for ' + path + ': ' + result.text);
   }
 }
 
