@@ -66,9 +66,21 @@ const BookingCalendar = () => {
         [assets]
     );
 
+    // Only offer a type that something is actually bookable under. Retiring every
+    // vehicle removes the Vehicles tab on its own, and adding one brings it back -
+    // no code change either way.
+    const availableTypes = useMemo(() => {
+        const present = ['room', 'vehicle', 'equipment']
+            .filter((type) => activeAssets.some((a) => a.type === type));
+        // With one type there is nothing to filter between.
+        return present.length > 1 ? ['all', ...present] : [];
+    }, [activeAssets]);
+
+    const effectiveType = availableTypes.includes(typeFilter) ? typeFilter : 'all';
+
     const visibleAssets = useMemo(
-        () => (typeFilter === 'all' ? activeAssets : activeAssets.filter((a) => a.type === typeFilter)),
-        [activeAssets, typeFilter]
+        () => (effectiveType === 'all' ? activeAssets : activeAssets.filter((a) => a.type === effectiveType)),
+        [activeAssets, effectiveType]
     );
 
     // Keep a valid selection as filters change.
@@ -165,11 +177,12 @@ const BookingCalendar = () => {
                 </Link>
             </div>
 
-            {/* Asset type filter */}
+            {/* Asset type filter - hidden when there is only one kind of asset */}
+            {availableTypes.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                {['all', 'room', 'vehicle', 'equipment'].map((type) => {
+                {availableTypes.map((type) => {
                     const Icon = TYPE_META[type]?.icon;
-                    const active = typeFilter === type;
+                    const active = effectiveType === type;
                     return (
                         <button
                             key={type}
@@ -185,6 +198,7 @@ const BookingCalendar = () => {
                     );
                 })}
             </div>
+            )}
 
             {/* Asset picker */}
             {visibleAssets.length === 0 ? (
